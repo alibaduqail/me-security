@@ -21,20 +21,6 @@ The dependency ranges are deliberately exact. ME Security uses version-targeted 
 
 ## Using the terminal
 
-Craft the terminal with this shaped recipe:
-
-```text
-I P I
-G T G
-I C I
-```
-
-- `I`: Iron Ingot
-- `P`: Engineering Processor
-- `G`: Quartz Glass
-- `T`: ME Terminal
-- `C`: 16k ME Storage Component
-
 Attach the terminal to an ME cable or a compatible device face, just like an ordinary AE2 terminal. It shares the cable-bus block with cables and other parts and uses one channel. The player who places a fresh terminal becomes its owner. Right-click the terminal to open its management screen, search players previously seen by the server, and grant or remove trust. Trust always includes permission to open and view the network; a newly trusted player starts without any additional permissions.
 
 Only the owner can edit permissions or manage patterns. Transferring ownership opens a confirmation field that requires the selected player's name. Trusted entries remain after transfer, while the previous owner loses access unless the new owner trusts them later.
