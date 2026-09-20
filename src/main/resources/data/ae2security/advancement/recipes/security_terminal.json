@@ -1,0 +1,9 @@
+{
+  "parent":"minecraft:recipes/root",
+  "criteria":{
+    "has_terminal":{"trigger":"minecraft:inventory_changed","conditions":{"items":[{"items":"ae2:terminal"}]}},
+    "has_the_recipe":{"trigger":"minecraft:recipe_unlocked","conditions":{"recipe":"ae2security:security_terminal"}}
+  },
+  "requirements":[["has_terminal","has_the_recipe"]],
+  "rewards":{"recipes":["ae2security:security_terminal"]}
+}

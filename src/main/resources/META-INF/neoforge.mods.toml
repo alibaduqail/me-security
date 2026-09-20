@@ -1,0 +1,47 @@
+modLoader="javafml"
+loaderVersion="[4,)"
+license="All Rights Reserved"
+
+[[mods]]
+modId="ae2security"
+version="${mod_version}"
+displayName="ME Security"
+description='''Private ME networks with UUID-based ownership and individual access permissions.'''
+
+[[mixins]]
+config="ae2security.mixins.json"
+
+[[dependencies.ae2security]]
+modId="minecraft"
+type="required"
+versionRange="[1.21.1]"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.ae2security]]
+modId="neoforge"
+type="required"
+versionRange="[21.1.250]"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.ae2security]]
+modId="ae2"
+type="required"
+versionRange="[19.2.17]"
+ordering="AFTER"
+side="BOTH"
+
+[[dependencies.ae2security]]
+modId="guideme"
+type="required"
+versionRange="[21.1.1]"
+ordering="AFTER"
+side="BOTH"
+
+[[dependencies.ae2security]]
+modId="ae2wtlib"
+type="optional"
+versionRange="[19.5.1]"
+ordering="AFTER"
+side="BOTH"

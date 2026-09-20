@@ -1,0 +1,9 @@
+{
+  "parent": "ae2:item/display_base",
+  "textures": {
+    "particle": "ae2:part/monitor_front",
+    "front_bright": "ae2security:part/security_terminal_bright",
+    "front_medium": "ae2security:part/security_terminal_medium",
+    "front_dark": "ae2security:part/security_terminal_dark"
+  }
+}
