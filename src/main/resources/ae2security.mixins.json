@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.ae2security.mixin",
+  "plugin": "dev.ae2security.mixin.SecurityMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "InWorldGridNodeAccessor", "NetworkStorageMixin", "MenuTypeBuilderMixin", "PartPlacementMixin",
+    "CableBusBlockEntityMixin", "CablePartMixin",
+    "AEBaseMenuMixin", "MenuBroadcastMixin", "MEStorageMenuMixin", "MenuInventoryMixin",
+    "PatternAccessMenuMixin", "CraftingCPUMenuMixin", "CraftingServiceMixin",
+    "CraftingCpuLogicMixin", "ServerboundPacketMixin"
+  ],
+  "injectors": { "defaultRequire": 1 }
+}

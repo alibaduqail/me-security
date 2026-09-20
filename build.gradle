@@ -1,0 +1,158 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.147'
+}
+
+group = 'dev.ae2security'
+version = mod_version
+base { archivesName = 'ae2security' }
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
+    withSourcesJar()
+}
+
+def localMinecraftLibraryCache = providers.gradleProperty('minecraftLibraryCache')
+def localServerAddress = providers.gradleProperty('serverAddress')
+
+repositories {
+    // Mojang's library host rejects TLS connections from some local JDK builds. This
+    // opt-in mirror uses the artifacts already installed by a Minecraft launcher and
+    // leaves normal builds and published dependency metadata unchanged.
+    if (localMinecraftLibraryCache.isPresent()) {
+        def cacheRoot = file(localMinecraftLibraryCache.get())
+        flatDir {
+            dirs(
+                    new File(cacheRoot, 'com/mojang/authlib/6.0.54'),
+                    new File(cacheRoot, 'com/mojang/blocklist/1.0.10'),
+                    new File(cacheRoot, 'com/mojang/brigadier/1.3.10'),
+                    new File(cacheRoot, 'com/mojang/datafixerupper/8.0.16'),
+                    new File(cacheRoot, 'com/mojang/logging/1.2.7'),
+                    new File(cacheRoot, 'com/mojang/patchy/2.2.10'),
+                    new File(cacheRoot, 'com/mojang/text2speech/1.17.9')
+            )
+            content { includeGroup 'com.mojang' }
+        }
+    }
+    mavenCentral()
+    maven {
+        url = 'https://modmaven.dev/'
+        content { includeGroup 'org.appliedenergistics' }
+    }
+    maven {
+        url = 'https://api.modrinth.com/maven'
+        content { includeGroup 'maven.modrinth' }
+    }
+}
+
+def prepareLocalMultiplayerServer = tasks.register('prepareLocalMultiplayerServer') {
+    doLast {
+        def serverDirectory = layout.projectDirectory.dir('run/multiplayer-server').asFile
+        serverDirectory.mkdirs()
+
+        def propertiesFile = new File(serverDirectory, 'server.properties')
+        def properties = new Properties()
+        if (propertiesFile.exists()) {
+            propertiesFile.withInputStream { properties.load(it) }
+        }
+
+        properties.setProperty('online-mode', 'false')
+        properties.setProperty('enforce-secure-profile', 'false')
+        properties.setProperty('gamemode', 'creative')
+        properties.setProperty('force-gamemode', 'true')
+        properties.setProperty('server-port', '25565')
+        properties.setProperty('spawn-protection', '0')
+        properties.setProperty('white-list', 'false')
+        properties.setProperty('motd', 'AE2 Security local test server')
+        propertiesFile.withOutputStream {
+            properties.store(it, 'Generated for local two-client development testing')
+        }
+    }
+}
+
+neoForge {
+    version = neo_version
+    runs {
+        client { client() }
+        guideClient {
+            client()
+            gameDirectory = layout.projectDirectory.dir('run/guide-client')
+            systemProperty 'ae2security.guidePreview', 'true'
+            if (providers.gradleProperty('guideWorld').isPresent()) {
+                programArgument '--quickPlaySingleplayer'
+                programArgument providers.gradleProperty('guideWorld').get()
+            }
+        }
+        ownerClient {
+            client()
+            gameDirectory = layout.projectDirectory.dir('run/owner-client')
+            programArgument '--username'
+            programArgument 'Owner'
+            if (localServerAddress.isPresent()) {
+                programArgument '--quickPlayMultiplayer'
+                programArgument localServerAddress.get()
+            }
+        }
+        guestClient {
+            client()
+            gameDirectory = layout.projectDirectory.dir('run/guest-client')
+            programArgument '--username'
+            programArgument 'Guest'
+            if (localServerAddress.isPresent()) {
+                programArgument '--quickPlayMultiplayer'
+                programArgument localServerAddress.get()
+            }
+        }
+        server {
+            server()
+            programArgument '--nogui'
+        }
+        multiplayerServer {
+            server()
+            gameDirectory = layout.projectDirectory.dir('run/multiplayer-server')
+            programArgument '--nogui'
+            taskBefore prepareLocalMultiplayerServer
+        }
+        gameTestServer {
+            type = 'gameTestServer'
+            // The lifecycle test is owned by ae2security and reuses Mojang's one-block empty template.
+            systemProperty 'neoforge.enabledGameTestNamespaces', 'ae2security,minecraft'
+        }
+        configureEach {
+            systemProperty 'mixin.debug.countInjections', 'true'
+            logLevel = org.slf4j.event.Level.INFO
+        }
+    }
+    mods {
+        ae2security { sourceSet sourceSets.main }
+    }
+    unitTest {
+        enable()
+        testedMod = mods.ae2security
+    }
+}
+
+dependencies {
+    implementation "org.appliedenergistics:appliedenergistics2:${ae2_version}"
+    // AE2 supplies GuideME at runtime; compile against its pinned public guide API.
+    compileOnly "org.appliedenergistics:guideme:${guideme_version}"
+    if (providers.gradleProperty('withWireless').orElse('false').get().toBoolean()) {
+        runtimeOnly "maven.modrinth:applied-energistics-2-wireless-terminals:${wt_version}"
+    }
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation "net.neoforged:testframework:${neo_version}"
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs.add('-Xlint:deprecation')
+}
+tasks.named('test') { useJUnitPlatform() }
+def resolvedModVersion = version.toString()
+tasks.named('processResources') {
+    inputs.property 'mod_version', resolvedModVersion
+    filesMatching('META-INF/neoforge.mods.toml') {
+        expand mod_version: resolvedModVersion
+    }
+}
