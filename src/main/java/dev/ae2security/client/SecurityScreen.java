@@ -23,17 +23,26 @@ import dev.ae2security.network.EditPolicy;
 import dev.ae2security.network.PolicySnapshot;
 import dev.ae2security.security.OwnershipConfirmation;
 import dev.ae2security.security.Permission;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> {
     private static final int PAGE_SIZE = 6;
+    private static final int PLAYER_LIST_WIDTH = 140;
+    private static final int SEARCH_FIELD_LEFT_INSET = 3;
+    private static final int SEARCH_FIELD_RIGHT_INSET = 5;
+    private static final int AE_TEXT_FIELD_TEXTURE_SIZE = 128;
     private static final int PERMISSION_TOP = 58;
     private static final int PERMISSION_ROW_HEIGHT = 22;
+    private static final ResourceLocation AE_TEXT_FIELD_TEXTURE =
+            ResourceLocation.fromNamespaceAndPath("ae2", "textures/guis/text_field.png");
 
     private static final int AE2_DARK = 0xFF413F54;
     private static final int AE2_BACKGROUND = 0xFFCBCCD4;
@@ -109,9 +118,9 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         help.setY(topPos + 5);
         help.setTooltip(Tooltip.create(Component.translatable("screen.ae2security.guide")));
 
-        // Match the 89x12 search field used by AE2's storage terminals. AETextField
-        // renders a fixed-width background texture and does not stretch cleanly.
-        search = addRenderableWidget(new AETextField(style, font, leftPos + 63, topPos + 54, 89, 12));
+        search = addRenderableWidget(new FullWidthSearchField(
+                style, font, leftPos + 12 + SEARCH_FIELD_LEFT_INSET + 2, topPos + 54,
+                PLAYER_LIST_WIDTH - SEARCH_FIELD_LEFT_INSET - SEARCH_FIELD_RIGHT_INSET, 12));
         search.setBordered(false);
         search.setMaxLength(64);
         search.setPlaceholder(Component.translatable("screen.ae2security.search"));
@@ -127,7 +136,7 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         for (int row = 0; row < PAGE_SIZE; row++) {
             int rowIndex = row;
             playerButtons[row] = addRenderableWidget(new PlayerButton(
-                    leftPos + 12, topPos + 74 + row * 18, 140, 17, Component.empty(),
+                    leftPos + 12, topPos + 74 + row * 18, PLAYER_LIST_WIDTH, 17, Component.empty(),
                     button -> selectVisiblePlayer(rowIndex)));
         }
 
@@ -455,6 +464,46 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
                 drawRaisedPanel(graphics, x, y, 20, 20);
             }
             super.renderWidget(graphics, mouseX, mouseY, partialTick);
+        }
+    }
+
+    /** Extends AE2's 128px text-field background to match the full player-list column. */
+    private static final class FullWidthSearchField extends AETextField {
+        private final int extensionWidth;
+
+        FullWidthSearchField(ScreenStyle style, Font font, int x, int y, int width, int height) {
+            super(style, font, x, y, AE_TEXT_FIELD_TEXTURE_SIZE, height);
+            extensionWidth = width - AE_TEXT_FIELD_TEXTURE_SIZE;
+        }
+
+        @Override
+        public boolean isMouseOver(double mouseX, double mouseY) {
+            int left = getX() - 2;
+            int top = getY() - 2;
+            return mouseX >= left && mouseX < left + AE_TEXT_FIELD_TEXTURE_SIZE + extensionWidth
+                    && mouseY >= top && mouseY < top + 12;
+        }
+
+        @Override
+        public Rect2i getTooltipArea() {
+            return new Rect2i(getX() - 2, getY() - 2, AE_TEXT_FIELD_TEXTURE_SIZE + extensionWidth, 12);
+        }
+
+        @Override
+        public void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+            super.renderWidget(graphics, mouseX, mouseY, partialTick);
+            if (!visible || extensionWidth <= 0) {
+                return;
+            }
+
+            // Cover AETextField's original right cap as well as the extension to avoid an inner seam.
+            int x = getX() - 2 + AE_TEXT_FIELD_TEXTURE_SIZE - 1;
+            int y = getY() - 2;
+            int textureY = isFocused() ? 24 : 0;
+            graphics.blit(AE_TEXT_FIELD_TEXTURE, x, y, extensionWidth, 12,
+                    1, textureY, 1, 12, AE_TEXT_FIELD_TEXTURE_SIZE, AE_TEXT_FIELD_TEXTURE_SIZE);
+            graphics.blit(AE_TEXT_FIELD_TEXTURE, x + extensionWidth, y, 1, 12,
+                    127, textureY, 1, 12, AE_TEXT_FIELD_TEXTURE_SIZE, AE_TEXT_FIELD_TEXTURE_SIZE);
         }
     }
 
