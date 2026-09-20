@@ -1,7 +1,6 @@
 {
   "itemGroup.ae2security": "ME Security",
   "item.ae2security.security_terminal": "ME Security Terminal",
-  "tooltip.ae2security.security_terminal": "Private ME access with owner-managed player permissions.",
   "message.ae2security.denied": "Access denied: you do not have permission for this ME network action.",
   "message.ae2security.build_denied": "Access denied: you need Build permission to add or recolor parts on this ME network.",
   "message.ae2security.break_denied": "Access denied: you do not have permission to remove parts from this ME network.",

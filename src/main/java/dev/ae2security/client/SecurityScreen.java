@@ -355,7 +355,6 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         drawRaisedPanel(graphics, x, y, imageWidth, imageHeight);
         drawInsetPanel(graphics, x + 7, y + 38, 151, 174);
         drawInsetPanel(graphics, x + 159, y + 38, 138, 174);
-        drawSecurityGlyph(graphics, x + 9, y + 7);
     }
 
     private static void drawRaisedPanel(GuiGraphics graphics, int x, int y, int width, int height) {
@@ -371,19 +370,9 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         graphics.fill(x + 1, y + 1, x + width - 2, y + height - 2, AE2_PANEL);
     }
 
-    private static void drawSecurityGlyph(GuiGraphics graphics, int x, int y) {
-        graphics.fill(x + 2, y, x + 7, y + 1, AE2_DARK);
-        graphics.fill(x + 1, y + 1, x + 3, y + 5, AE2_DARK);
-        graphics.fill(x + 6, y + 1, x + 8, y + 5, AE2_DARK);
-        graphics.fill(x + 3, y + 1, x + 6, y + 2, AE2_ACCENT);
-        graphics.fill(x, y + 4, x + 9, y + 11, AE2_DARK);
-        graphics.fill(x + 1, y + 5, x + 8, y + 10, AE2_ACCENT);
-        graphics.fill(x + 4, y + 6, x + 5, y + 9, AE2_DARK);
-    }
-
     @Override
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
-        graphics.drawString(font, title, 22, 9, AE2_DARK, false);
+        graphics.drawString(font, title, 9, 9, AE2_DARK, false);
 
         var snapshot = menu.snapshot();
         if (snapshot == null) {
@@ -490,7 +479,8 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
             int y = getY();
             int right = x + getWidth();
             int bottom = y + getHeight();
-            graphics.fill(x - 1, y - 1, right + 1, y, AE2_ACCENT);
+            int top = isHovered() ? y : y - 1;
+            graphics.fill(x - 1, top, right + 1, top + 1, AE2_ACCENT);
             graphics.fill(x - 1, bottom, right + 1, bottom + 1, AE2_ACCENT);
             graphics.fill(x - 1, y, x, bottom, AE2_ACCENT);
             graphics.fill(right, y, right + 1, bottom, AE2_ACCENT);
