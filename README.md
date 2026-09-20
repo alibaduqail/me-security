@@ -42,16 +42,6 @@ Wireless terminals still require normal AE2 access-point pairing and range or qu
 
 Only its owner can dismantle a Security Terminal or break the cable-bus block containing it, regardless of Build permission. Removing it retires its policy and drops a fresh, unbound part item. Policy identities and conservative topology associations survive chunk unloads and server restarts without chunk loading. Power loss and channel exhaustion do not turn protection off.
 
-### Custom terminal face textures
-
-The terminal face uses the same three-layer tint model as AE2's terminals. Supply three 16x16 transparent PNGs:
-
-- `src/main/resources/assets/ae2security/textures/part/security_terminal_bright.png`
-- `src/main/resources/assets/ae2security/textures/part/security_terminal_medium.png`
-- `src/main/resources/assets/ae2security/textures/part/security_terminal_dark.png`
-
-Put each face pixel in exactly one of those images and leave the same pixel transparent in the other two. Use white pixels when you want the cable color to appear without another hue mixed into it; grayscale pixels can reduce the brightness further. AE2 applies the attached cable's bright, medium, and dark color variants to those layers at render time, so separate PNGs for all cable colors are unnecessary. The outer housing, connection status lights, powered emissive rendering, and cable-color lookup come from AE2's display models and cable bus renderer.
-
 ## Scope and limitations
 
 ME Security controls player access through supported AE2 and AE2 Wireless Terminals menus, network storage transactions, crafting requests, crafting controls, and wireless restock inventory synchronization. Machine automation has no player principal and continues normally. Jobs already accepted by a crafting CPU continue after the initiating player's access changes.
