@@ -52,60 +52,6 @@ The terminal face uses the same three-layer tint model as AE2's terminals. Suppl
 
 Put each face pixel in exactly one of those images and leave the same pixel transparent in the other two. Use white pixels when you want the cable color to appear without another hue mixed into it; grayscale pixels can reduce the brightness further. AE2 applies the attached cable's bright, medium, and dark color variants to those layers at render time, so separate PNGs for all cable colors are unnecessary. The outer housing, connection status lights, powered emissive rendering, and cable-color lookup come from AE2's display models and cable bus renderer.
 
-Inventory icons use these same masks with AE2's default Fluix tint colors. No separate composite face texture is required; particles use AE2's monitor housing texture.
-
-### In-game guide
-
-Click the help button at the top right of the Security Terminal screen, or hover its item and hold the configured GuideME guide key (W by default). The page also appears under **Items, Blocks, and Machines** in AE2's guide. It includes the recipe, trust controls, every permission, ownership transfer, Build behavior, disconnections, and protection limits.
-
-The source is `src/main/resources/assets/ae2security/ae2guide/security_terminal.md`. GuideME loads it into AE2's existing guide and associates it with `ae2security:security_terminal`; no extra guide item is needed. `./gradlew runGuideClient` starts an isolated client: create or enter a world and it verifies the page, item link, and navigation entry before opening the page. You can reopen an existing preview world directly with `./gradlew runGuideClient -PguideWorld="World Folder Name"`. GuideME 21.1.1 requires a loaded world for recipes and linked 3D scenes, so the preview waits until the world is ready.
-
-## Building and testing
-
-Use a Java 21 JDK:
-
-```shell
-./gradlew build
-./gradlew runGameTestServer
-./gradlew test -PwithWireless=true
-```
-
-The normal build resolves dependencies from Maven Central, ModMaven, Modrinth, and Mojang. If a local JDK cannot negotiate TLS with Mojang's library host, the optional `minecraftLibraryCache` property can point at an existing launcher library directory:
-
-```shell
-./gradlew build -PminecraftLibraryCache="/path/to/launcher/meta/libraries"
-```
-
-The distributable JAR is written to `build/libs/ae2security-<version>.jar`. The GameTest server places real parts and exercises server menu edits, simulated/executed item and fluid transfers, automation, conflicts, disconnected colors and side parts, Build-controlled placement/removal/recoloring, Creative mining, outward toggle-bus nodes, rapid permission changes, stale screens, cable splits/rejoins, and crafting-context scope. JUnit covers all permission masks, ownership transfer confirmation, revocation, conflicts, immutable snapshots, and policy/world-data NBT. See `docs/release-readiness-1.0.0.md` for the stable-release evidence and remaining manual checks.
-
-### Testing with two local players
-
-Development clients use offline test identities, so opening a client world to LAN can reject the second client with an invalid-session error. Use the included offline local development server instead. Open a terminal and keep this task running:
-
-```shell
-./gradlew runMultiplayerServer
-```
-
-Open two more terminals in the project directory:
-
-```shell
-# Terminal 2
-./gradlew runOwnerClient
-
-# Terminal 3
-./gradlew runGuestClient
-```
-
-In both clients, choose **Multiplayer**, **Direct Connection**, and connect to `localhost:25565`. Do not use **Open to LAN**. The server run automatically uses `online-mode=false`, disables secure-profile enforcement, and starts players in Creative mode.
-
-To connect either development client automatically, add `-PserverAddress=localhost:25565` to its command, for example `./gradlew runOwnerClient -PserverAddress=localhost:25565`.
-
-The two development profiles are named `Owner` and `Guest`, so their UUIDs and permissions remain distinct. Have Owner place the Security Terminal, use Guest first as an outsider, then trust Guest and grant Insert, Extract, Craft, and Build one at a time. The server and both clients keep separate settings, logs, and saves under `run/multiplayer-server`, `run/owner-client`, and `run/guest-client`.
-
-After rebuilding or changing network payloads, stop the development server and close both clients before launching all three again. Development Minecraft processes do not hot-reload mod classes. A payload-version mismatch means at least one process is still running an older build; a `world/session.lock` error means an earlier server process is still using that world.
-
-The permission-button fixes use network protocol **3**. Restart the server and both clients together after updating from an earlier build.
-
 ## Scope and limitations
 
 ME Security controls player access through supported AE2 and AE2 Wireless Terminals menus, network storage transactions, crafting requests, crafting controls, and wireless restock inventory synchronization. Machine automation has no player principal and continues normally. Jobs already accepted by a crafting CPU continue after the initiating player's access changes.
