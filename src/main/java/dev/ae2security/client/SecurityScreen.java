@@ -21,20 +21,22 @@ import guideme.PageAnchor;
 import dev.ae2security.menu.SecurityMenu;
 import dev.ae2security.network.EditPolicy;
 import dev.ae2security.network.PolicySnapshot;
+import dev.ae2security.network.PolicyEditResult;
+import dev.ae2security.network.PlayerSearchRequest;
+import dev.ae2security.network.PlayerSearchResult;
 import dev.ae2security.security.OwnershipConfirmation;
 import dev.ae2security.security.Permission;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
-import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> {
-    private static final int PAGE_SIZE = 6;
+    private static final int PAGE_SIZE = PlayerSearchResult.PAGE_SIZE;
     private static final int PLAYER_LIST_WIDTH = 140;
     private static final int SEARCH_FIELD_LEFT_INSET = 3;
     private static final int SEARCH_FIELD_RIGHT_INSET = 5;
@@ -72,6 +74,15 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
     private String transferInput = "";
     private PolicySnapshot displayed;
     private boolean pending;
+    private int pendingRequestId = -1;
+    private int nextRequestId;
+    private PolicyEditResult processedEditResult;
+    private PolicyEditResult.Result editStatus;
+    private PlayerSearchResult processedSearchResult;
+    private int searchSequence;
+    private int searchDelay = -1;
+    private boolean searchPending;
+    private int totalPlayers;
 
     public SecurityScreen(SecurityMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
@@ -81,24 +92,11 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
     }
 
     private List<PolicySnapshot.PlayerEntry> filtered() {
-        var snapshot = menu.snapshot();
-        if (snapshot == null) {
-            return List.of();
-        }
-
-        String filter = query.toLowerCase(Locale.ROOT);
-        return snapshot.players().stream()
-                .filter(player -> player.name().toLowerCase(Locale.ROOT).contains(filter)
-                        || player.id().toString().startsWith(filter))
-                .toList();
+        return visiblePlayers;
     }
 
     private PolicySnapshot.PlayerEntry selection() {
-        var snapshot = menu.snapshot();
-        if (snapshot == null) {
-            return null;
-        }
-        return snapshot.players().stream()
+        return visiblePlayers.stream()
                 .filter(player -> player.id().equals(selected))
                 .findFirst()
                 .orElse(null);
@@ -124,12 +122,15 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         search.setBordered(false);
         search.setMaxLength(64);
         search.setPlaceholder(Component.translatable("screen.ae2security.search"));
-        search.setTooltipMessage(List.of(Component.translatable("screen.ae2security.search_tooltip")));
+        search.setMessage(Component.translatable("screen.ae2security.search"));
+        search.setTooltip(Tooltip.create(Component.translatable("screen.ae2security.search_tooltip")));
         search.setValue(query);
         search.setResponder(value -> {
             query = value;
             page = 0;
+            selected = null;
             clearTransferConfirmation();
+            scheduleSearch(4, true);
             refreshControls();
         });
 
@@ -142,12 +143,16 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
 
         previousPageButton = ae2Button(12, 186, 34, 18, Component.literal("<"), () -> {
             page--;
+            selected = null;
             clearTransferConfirmation();
+            scheduleSearch(0, true);
             refreshControls();
         });
         nextPageButton = ae2Button(118, 186, 34, 18, Component.literal(">"), () -> {
             page++;
+            selected = null;
             clearTransferConfirmation();
+            scheduleSearch(0, true);
             refreshControls();
         });
 
@@ -167,6 +172,7 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         transferName.setBordered(false);
         transferName.setMaxLength(64);
         transferName.setPlaceholder(Component.translatable("screen.ae2security.transfer_name"));
+        transferName.setMessage(Component.translatable("screen.ae2security.transfer_name"));
         transferName.setValue(transferInput);
         transferName.setResponder(value -> {
             transferInput = value;
@@ -176,6 +182,7 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         transferButton.setTooltip(Tooltip.create(Component.translatable("screen.ae2security.transfer_warning")));
 
         displayed = menu.snapshot();
+        if (displayed != null) scheduleSearch(0, true);
         refreshControls();
         setInitialFocus(search);
     }
@@ -248,11 +255,11 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
             return;
         }
 
-        var rows = filtered();
-        int lastPage = Math.max(0, (rows.size() - 1) / PAGE_SIZE);
-        page = Math.max(0, Math.min(page, lastPage));
-        int first = page * PAGE_SIZE;
-        visiblePlayers = rows.subList(first, Math.min(rows.size(), first + PAGE_SIZE));
+        int lastPage = Math.max(0, (totalPlayers - 1) / PAGE_SIZE);
+        if (!searchPending && page > lastPage) {
+            page = lastPage;
+            scheduleSearch(0, true);
+        }
 
         for (int row = 0; row < PAGE_SIZE; row++) {
             var button = playerButtons[row];
@@ -271,8 +278,8 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
             button.active = true;
         }
 
-        previousPageButton.active = page > 0;
-        nextPageButton.active = page < lastPage;
+        previousPageButton.active = !searchPending && page > 0;
+        nextPageButton.active = !searchPending && page < lastPage;
 
         var player = selection();
         boolean trusted = player != null && player.trusted();
@@ -284,7 +291,7 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
             var description = Component.translatable(permissionKey + ".description");
             button.setSelected(enabled);
             button.visible = trusted;
-            button.active = trusted;
+            button.active = trusted && !searchPending;
             button.setTooltip(Tooltip.create(Component.empty()
                     .append(Component.translatable(
                             enabled ? "screen.ae2security.permission_enabled"
@@ -294,19 +301,20 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
                     .append(description)));
         }
 
-        trustButton.setMessage(Component.translatable(
-                trusted ? "screen.ae2security.remove" : "screen.ae2security.trust"));
+        trustButton.setMessage(Component.translatable(pending
+                ? "screen.ae2security.pending"
+                : trusted ? "screen.ae2security.remove" : "screen.ae2security.trust"));
         trustButton.setY(topPos + (trusted ? 147 : 116));
         trustButton.visible = player != null;
-        trustButton.active = player != null;
+        trustButton.active = player != null && !pending && !searchPending;
 
         boolean confirming = trusted && player.id().equals(transferConfirmation);
         transferName.visible = confirming;
-        transferName.active = confirming;
+        transferName.active = confirming && !pending && !searchPending;
         transferButton.setMessage(Component.translatable(
                 confirming ? "screen.ae2security.confirm_transfer" : "screen.ae2security.transfer"));
         transferButton.visible = trusted;
-        transferButton.active = trusted
+        transferButton.active = trusted && !pending && !searchPending
                 && (!confirming || OwnershipConfirmation.matches(player.name(), transferInput));
     }
 
@@ -321,8 +329,13 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
             return;
         }
 
-        if (!toggle) pending = true;
-        PacketDistributor.sendToServer(new EditPolicy(menu.containerId, snapshot.revision(), selected, action, mask,
+        int requestId = ++nextRequestId;
+        if (!toggle) {
+            pending = true;
+            pendingRequestId = requestId;
+        }
+        editStatus = null;
+        PacketDistributor.sendToServer(new EditPolicy(menu.containerId, requestId, snapshot.revision(), selected, action, mask,
                 confirmation));
         refreshControls();
     }
@@ -331,16 +344,71 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         transferConfirmation = null;
         transferInput = "";
         if (transferName != null) transferName.setValue("");
+        if (transferName != null) transferName.setFocused(false);
+        if (getFocused() == transferName) setFocused(null);
+    }
+
+    private void scheduleSearch(int delay, boolean clearRows) {
+        searchSequence++;
+        searchDelay = delay;
+        searchPending = true;
+        if (clearRows) {
+            visiblePlayers = List.of();
+            totalPlayers = 0;
+        }
     }
 
     @Override
     protected void containerTick() {
         super.containerTick();
         if (displayed != menu.snapshot()) {
+            var old = displayed;
             displayed = menu.snapshot();
-            pending = false;
-            clearTransferConfirmation();
+            if (old == null || displayed == null || !old.owner().equals(displayed.owner()))
+                clearTransferConfirmation();
+            if (displayed != null && (old == null
+                    || old.revision() != displayed.revision()
+                    || old.directoryRevision() != displayed.directoryRevision()))
+                scheduleSearch(0, false);
             refreshControls();
+        }
+        var editResult = menu.editResult();
+        if (editResult != null && editResult != processedEditResult) {
+            processedEditResult = editResult;
+            if (editResult.requestId() == pendingRequestId) {
+                pendingRequestId = -1;
+                pending = false;
+                editStatus = editResult.result();
+            }
+            refreshControls();
+        }
+        if (searchDelay >= 0 && menu.snapshot() != null && --searchDelay < 0) {
+            PacketDistributor.sendToServer(new PlayerSearchRequest(menu.containerId,
+                    searchSequence, query, page));
+        }
+        var result = menu.searchResult();
+        if (result != null && result != processedSearchResult) {
+            processedSearchResult = result;
+            if (result.sequence() == searchSequence) {
+                if (result.busy()) {
+                    searchDelay = 3;
+                } else {
+                    var previousSelection = selection();
+                    searchPending = false;
+                    page = result.page();
+                    totalPlayers = result.total();
+                    visiblePlayers = result.players();
+                    var currentSelection = selection();
+                    if (currentSelection == null) {
+                        selected = null;
+                        clearTransferConfirmation();
+                    } else if (previousSelection != null && (!currentSelection.trusted()
+                            || !previousSelection.name().equals(currentSelection.name()))) {
+                        clearTransferConfirmation();
+                    }
+                    refreshControls();
+                }
+            }
         }
     }
 
@@ -426,11 +494,18 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         }
 
         var rows = filtered();
-        String pages = (page + 1) + " / " + Math.max(1, (rows.size() + PAGE_SIZE - 1) / PAGE_SIZE);
+        String pages = (page + 1) + " / " + Math.max(1, (totalPlayers + PAGE_SIZE - 1) / PAGE_SIZE);
         graphics.drawCenteredString(font, pages, 82, 191, AE2_DARK);
         if (rows.isEmpty()) {
-            graphics.drawCenteredString(font, Component.translatable("screen.ae2security.no_players"), 82, 98,
+            graphics.drawCenteredString(font, Component.translatable(searchPending
+                    ? "screen.ae2security.searching" : "screen.ae2security.no_players"), 82, 98,
                     AE2_MUTED_TEXT);
+        }
+        if (pending || editStatus != null && transferConfirmation == null) {
+            var status = Component.translatable(pending ? "screen.ae2security.pending"
+                    : "screen.ae2security.edit_result." + editStatus.name().toLowerCase(Locale.ROOT));
+            graphics.drawString(font, font.plainSubstrByWidth(status.getString(), 128),
+                    164, 173, editStatus == PolicyEditResult.Result.APPLIED ? AE2_DARK : STATUS_WARNING, false);
         }
 
     }
@@ -467,43 +542,23 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         }
     }
 
-    /** Extends AE2's 128px text-field background to match the full player-list column. */
+    /** Fills AE2's 128px texture middle while retaining the full editor width. */
     private static final class FullWidthSearchField extends AETextField {
-        private final int extensionWidth;
-
         FullWidthSearchField(ScreenStyle style, Font font, int x, int y, int width, int height) {
-            super(style, font, x, y, AE_TEXT_FIELD_TEXTURE_SIZE, height);
-            extensionWidth = width - AE_TEXT_FIELD_TEXTURE_SIZE;
-        }
-
-        @Override
-        public boolean isMouseOver(double mouseX, double mouseY) {
-            int left = getX() - 2;
-            int top = getY() - 2;
-            return mouseX >= left && mouseX < left + AE_TEXT_FIELD_TEXTURE_SIZE + extensionWidth
-                    && mouseY >= top && mouseY < top + 12;
-        }
-
-        @Override
-        public Rect2i getTooltipArea() {
-            return new Rect2i(getX() - 2, getY() - 2, AE_TEXT_FIELD_TEXTURE_SIZE + extensionWidth, 12);
+            super(style, font, x, y, width, height);
         }
 
         @Override
         public void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-            super.renderWidget(graphics, mouseX, mouseY, partialTick);
-            if (!visible || extensionWidth <= 0) {
-                return;
+            if (visible) {
+                var area = getTooltipArea();
+                int extension = area.getWidth() - AE_TEXT_FIELD_TEXTURE_SIZE;
+                if (extension > 0) graphics.blit(AE_TEXT_FIELD_TEXTURE,
+                        area.getX() + 127, area.getY(), extension, 12,
+                        1, isFocused() ? 24 : 0, 1, 12,
+                        AE_TEXT_FIELD_TEXTURE_SIZE, AE_TEXT_FIELD_TEXTURE_SIZE);
             }
-
-            // Cover AETextField's original right cap as well as the extension to avoid an inner seam.
-            int x = getX() - 2 + AE_TEXT_FIELD_TEXTURE_SIZE - 1;
-            int y = getY() - 2;
-            int textureY = isFocused() ? 24 : 0;
-            graphics.blit(AE_TEXT_FIELD_TEXTURE, x, y, extensionWidth, 12,
-                    1, textureY, 1, 12, AE_TEXT_FIELD_TEXTURE_SIZE, AE_TEXT_FIELD_TEXTURE_SIZE);
-            graphics.blit(AE_TEXT_FIELD_TEXTURE, x + extensionWidth, y, 1, 12,
-                    127, textureY, 1, 12, AE_TEXT_FIELD_TEXTURE_SIZE, AE_TEXT_FIELD_TEXTURE_SIZE);
+            super.renderWidget(graphics, mouseX, mouseY, partialTick);
         }
     }
 

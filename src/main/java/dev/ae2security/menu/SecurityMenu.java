@@ -25,6 +25,9 @@ public final class SecurityMenu extends AbstractContainerMenu {
     private long sentDirectoryRevision = -1;
     private String sentStatus = "";
     private PolicySnapshot snapshot;
+    private PlayerSearchResult searchResult;
+    private PolicyEditResult editResult;
+    private long lastSearchAt;
 
     public SecurityMenu(int id, Inventory inventory, BlockPos position, Direction side) {
         this(id, inventory, position, side, null);
@@ -43,6 +46,14 @@ public final class SecurityMenu extends AbstractContainerMenu {
     public PolicySnapshot snapshot() { return snapshot; }
     public void acceptSnapshot(PolicySnapshot snapshot) {
         if (player.level().isClientSide() && snapshot.menuId() == containerId) this.snapshot = snapshot;
+    }
+    public PlayerSearchResult searchResult() { return searchResult; }
+    public PolicyEditResult editResult() { return editResult; }
+    public void acceptSearchResult(PlayerSearchResult result) {
+        if (player.level().isClientSide() && result.menuId() == containerId) searchResult = result;
+    }
+    public void acceptEditResult(PolicyEditResult result) {
+        if (player.level().isClientSide() && result.menuId() == containerId) editResult = result;
     }
 
     private SecurityTerminalPart terminal() {
@@ -75,23 +86,42 @@ public final class SecurityMenu extends AbstractContainerMenu {
         var grid = SecurityAccess.grid(terminal());
         String status = grid == null ? "disconnected" : grid.getService(ISecurityGrid.class).terminalIds().size() > 1 ? "conflict" : "protected";
         if (policy.revision() == sentRevision && data.directoryRevision() == sentDirectoryRevision && status.equals(sentStatus)) return;
-        var names = new HashMap<>(data.players());
-        for (var id : policy.trusted().keySet()) names.putIfAbsent(id, data.name(id));
-        var entries = names.entrySet().stream().filter(entry -> !entry.getKey().equals(policy.owner()))
-                .sorted(Comparator.<Map.Entry<UUID, String>, Boolean>comparing(e -> !policy.trusted().containsKey(e.getKey()))
-                        .thenComparing(Map.Entry::getValue, String.CASE_INSENSITIVE_ORDER).thenComparing(Map.Entry::getKey))
-                .limit(PolicySnapshot.MAX_PLAYERS)
-                .map(entry -> new PolicySnapshot.PlayerEntry(entry.getKey(), entry.getValue(), policy.trusted().containsKey(entry.getKey()),
-                        policy.permissions(entry.getKey()))).toList();
         PacketDistributor.sendToPlayer(serverPlayer, new PolicySnapshot(containerId, policy.owner(), data.name(policy.owner()),
-                policy.revision(), status, entries));
+                policy.revision(), status, data.directoryRevision()));
         sentRevision = policy.revision();
         sentDirectoryRevision = data.directoryRevision();
         sentStatus = status;
     }
 
+    public void search(Player actor, PlayerSearchRequest request) {
+        if (!(actor instanceof ServerPlayer serverPlayer) || actor != player || actor.containerMenu != this
+                || request.menuId() != containerId || !stillValid(actor)) return;
+        if (request.page() < 0 || request.query().length() > 64) return;
+        long now = System.nanoTime();
+        if (lastSearchAt != 0 && now - lastSearchAt < 100_000_000L) {
+            PacketDistributor.sendToPlayer(serverPlayer, new PlayerSearchResult(containerId,
+                    request.sequence(), request.page(), 0, true, List.of()));
+            return;
+        }
+        lastSearchAt = now;
+        var data = SecuritySavedData.get(serverPlayer.server);
+        var policy = data.policy(terminalId);
+        if (policy == null) return;
+        PacketDistributor.sendToPlayer(serverPlayer, PlayerDirectorySearch.search(containerId,
+                request.sequence(), policy.owner(), data.players(), policy, request.query(), request.page()));
+    }
+
+    private void acknowledge(ServerPlayer player, EditPolicy edit, PolicyEditResult.Result result) {
+        PacketDistributor.sendToPlayer(player, new PolicyEditResult(containerId, edit.requestId(), result));
+    }
+
     public void edit(Player actor, EditPolicy edit) {
-        if (!(actor instanceof ServerPlayer serverPlayer) || actor != player || !stillValid(actor)) return;
+        if (!(actor instanceof ServerPlayer serverPlayer) || actor != player || actor.containerMenu != this) return;
+        if (!stillValid(actor)) {
+            acknowledge(serverPlayer, edit, PolicyEditResult.Result.DENIED);
+            serverPlayer.closeContainer();
+            return;
+        }
         var data = SecuritySavedData.get(serverPlayer.server);
         var policy = data.policy(terminalId);
         boolean toggle = edit.action() == EditPolicy.Action.TOGGLE_PERMISSION;
@@ -100,15 +130,20 @@ public final class SecurityMenu extends AbstractContainerMenu {
         boolean invalidRevision = toggle ? edit.revision() > policy.revision() : policy.revision() != edit.revision();
         boolean invalidToggle = toggle && Permission.editable().stream().noneMatch(p -> p.bit() == edit.permissions());
         if (invalidRevision || invalidToggle || edit.permissions() < 0 || edit.permissions() > Permission.ALL) {
+            acknowledge(serverPlayer, edit, PolicyEditResult.Result.REFRESH);
             sentRevision = -1;
             broadcastChanges();
             return;
         }
-        if (edit.target().equals(policy.owner()) || !data.players().containsKey(edit.target()) && !policy.trusted().containsKey(edit.target())) return;
+        if (edit.target().equals(policy.owner()) || !data.players().containsKey(edit.target()) && !policy.trusted().containsKey(edit.target())) {
+            acknowledge(serverPlayer, edit, PolicyEditResult.Result.INVALID);
+            return;
+        }
         if (edit.action() == EditPolicy.Action.TRANSFER
                 && !OwnershipConfirmation.matches(data.name(edit.target()), edit.confirmation())) {
             actor.sendSystemMessage(Component.translatable("message.ae2security.transfer_name_mismatch",
                     data.name(edit.target())));
+            acknowledge(serverPlayer, edit, PolicyEditResult.Result.INVALID);
             sentRevision = -1;
             broadcastChanges();
             return;
@@ -123,12 +158,14 @@ public final class SecurityMenu extends AbstractContainerMenu {
             case TRANSFER -> policy.transfer(actor.getUUID(), edit.target());
         };
         if (updated == policy) {
+            acknowledge(serverPlayer, edit, PolicyEditResult.Result.REFRESH);
             sentRevision = -1;
             broadcastChanges();
             return;
         }
         data.update(terminalId, updated);
         SecurityAccess.policyChanged(serverPlayer.server, terminalId, policy, updated);
+        acknowledge(serverPlayer, edit, PolicyEditResult.Result.APPLIED);
         if (!updated.isOwner(actor.getUUID())) {
             actor.sendSystemMessage(Component.translatable("message.ae2security.transferred", data.name(updated.owner())));
             serverPlayer.closeContainer();

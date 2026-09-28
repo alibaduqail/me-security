@@ -381,6 +381,7 @@ public final class SecurityGameTests {
             data.rememberPlayer(target, "ClickGuest");
             data.update(terminal.terminalId(), data.policy(terminal.terminalId()).trust(owner.getUUID(), target, 0));
             var menu = new dev.ae2security.menu.SecurityMenu(1, owner.getInventory(), terminal);
+            owner.containerMenu = menu;
             var revision = data.policy(terminal.terminalId()).revision();
             // A client can send several clicks before receiving any server snapshot.
             for (var permission : List.of(Permission.INSERT, Permission.BUILD)) {
@@ -399,6 +400,7 @@ public final class SecurityGameTests {
                     dev.ae2security.network.EditPolicy.Action.TOGGLE_PERMISSION, Permission.ALL, ""));
             helper.assertValueEqual(beforeInvalid, data.policy(terminal.terminalId()),
                     "a toggle packet must not accept a combined permission mask");
+            owner.containerMenu = owner.inventoryMenu;
             helper.destroyBlock(TERMINAL_POS);
             helper.succeed();
         });
@@ -499,11 +501,13 @@ public final class SecurityGameTests {
             players.add(guest);
             try {
                 var menu = new dev.ae2security.menu.SecurityMenu(1, owner.getInventory(), terminal);
+                owner.containerMenu = menu;
                 menu.edit(owner, new dev.ae2security.network.EditPolicy(1, data.policy(terminal.terminalId()).revision(),
                         guest.getUUID(), dev.ae2security.network.EditPolicy.Action.PERMISSIONS, Permission.VIEW.bit(), ""));
                 helper.assertTrue(guest.containerMenu == guest.inventoryMenu,
                         "revoking Extract must close the affected open storage screen even when View remains");
             } finally {
+                owner.containerMenu = owner.inventoryMenu;
                 players.remove(guest);
                 guest.containerMenu = guest.inventoryMenu;
             }

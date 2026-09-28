@@ -40,5 +40,11 @@
   "screen.ae2security.loading": "Loading policy...",
   "screen.ae2security.no_players": "No matching players",
   "screen.ae2security.conflict": "Conflict",
-  "screen.ae2security.disconnected": "Disconnected"
+  "screen.ae2security.disconnected": "Disconnected",
+  "screen.ae2security.pending": "Saving...",
+  "screen.ae2security.searching": "Searching...",
+  "screen.ae2security.edit_result.applied": "Changes saved",
+  "screen.ae2security.edit_result.refresh": "Policy changed. Refresh and retry.",
+  "screen.ae2security.edit_result.denied": "Access lost",
+  "screen.ae2security.edit_result.invalid": "Action was rejected"
 }
