@@ -6,6 +6,7 @@ license="All Rights Reserved"
 modId="ae2security"
 version="${mod_version}"
 displayName="ME Security"
+logoFile="icon.png"
 description='''Private ME networks with UUID-based ownership and individual access permissions.'''
 
 [[mixins]]

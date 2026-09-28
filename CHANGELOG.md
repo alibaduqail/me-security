@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.1.0-dev.1 — unreleased Security Terminal candidate
+
+### Added
+
+- Authenticated server-side player search with bounded pages across the complete known-player directory.
+
+### Fixed
+
+- Policy edits now acknowledge the result, and pending trust and transfer actions are visibly disabled.
+- The active player selection stays aligned with the visible search page; unrelated directory updates preserve transfer confirmation.
+- The search editor uses its full width and exposes its help through the normal tooltip and narration APIs.
+
+### Compatibility
+
+- Client and server must both use this candidate; its payload protocol is version 4.
+
 ## 1.0.0 - 2026-09-20
 
 First stable release for Minecraft 1.21.1.

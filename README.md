@@ -2,7 +2,9 @@
 
 ME Security is a NeoForge addon for Applied Energistics 2 that restores a classic-inspired ME Security Terminal. The terminal is an AE2 cable part; attaching it makes an ME grid private to its owner and lets that owner grant per-player access.
 
-The current stable release is **1.0.0**. See [CHANGELOG.md](CHANGELOG.md) for release notes.
+The current stable release is **1.0.0**. This checkout builds the unreleased
+**1.1.0-dev.1** Security Terminal candidate, whose protocol is incompatible
+with 1.0.0. See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## Requirements
 
