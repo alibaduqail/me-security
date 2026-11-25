@@ -1,6 +1,7 @@
 package dev.ae2security.client;
 
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -419,7 +420,7 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
             return;
         }
 
-        SecurityGui.networkStatus(graphics, style, font, snapshot.status(), imageWidth - 8, 6);
+        SecurityGui.networkWarning(graphics, style, font, snapshot.status(), imageWidth - 8, 6);
         int ownerWidth = imageWidth - 16;
         SecurityGui.text(graphics, font, font.plainSubstrByWidth(
                 Component.translatable("screen.ae2security.owner", snapshot.ownerName()).getString(), ownerWidth),
@@ -430,11 +431,22 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
                     ? "screen.ae2security.searching" : "screen.ae2security.no_players"));
         }
         int footerY = listBox.getY() + listBox.getHeight() + 3;
-        SecurityGui.text(graphics, font, Component.translatable("screen.ae2security.players"),
-                listBox.getX() + 1, footerY, muted);
         String pages = (players.page() + 1) + " / " + (players.lastPage() + 1);
-        SecurityGui.text(graphics, font, pages,
-                scrollBox.getX() + scrollBox.getWidth() - font.width(pages), footerY, muted);
+        int pagesX = scrollBox.getX() + scrollBox.getWidth() - font.width(pages);
+        SecurityGui.text(graphics, font, pages, pagesX, footerY, muted);
+        // The access panel has no name heading; its player is the highlighted row. When that
+        // row is on another page (trusting re-sorts the list), the footer names them instead.
+        var selected = players.selection();
+        if (selected != null && !SecurityScreenText.isListed(players.players(), selected)) {
+            int width = pagesX - listBox.getX() - 5;
+            String label = SecurityScreenText.firstThatFits(List.of(
+                    Component.translatable("screen.ae2security.selected_elsewhere", selected.name()).getString(),
+                    selected.name()), width, font::width);
+            SecurityGui.text(graphics, font, font.plainSubstrByWidth(label, width), listBox.getX() + 1, footerY, text);
+        } else {
+            SecurityGui.text(graphics, font, Component.translatable("screen.ae2security.players"),
+                    listBox.getX() + 1, footerY, muted);
+        }
 
         access.draw(graphics, players.selection(), transferConfirmation, edits.pending(), edits.status());
     }
