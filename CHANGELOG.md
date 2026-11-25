@@ -1,16 +1,49 @@
 # Changelog
 
-## 1.1.0-dev.1 — unreleased Security Terminal candidate
+## 1.1.0-dev.2 — unreleased development candidate
 
-### Added
+### Changed
 
-- Authenticated server-side player search with bounded pages across the complete known-player directory.
+- Build now protects native AE2 network hardware: placement, mining, wrench removal, rotation, configuration, storage-cell management, and crafting-unit upgrades.
+- Placement and connection changes check affected native multiblocks and reject merges containing multiple Security Terminals.
+- Native hardware menus require Build; security and pattern management remain owner-only. Block/part menu actions validate live hosts and an eight-block range.
+- Protected network hardware survives explosions, including the entire Security Terminal cable-bus block.
+- External disk transfers are disabled in protected drives, ME Chests, ME IO Ports, and Spatial IO Ports, including handlers cached before terminal installation. Ordinary resource automation continues.
 
 ### Fixed
 
-- Policy edits now acknowledge the result, and pending trust and transfer actions are visibly disabled.
-- The active player selection stays aligned with the visible search page; unrelated directory updates preserve transfer confirmation.
-- The search editor uses its full width and exposes its help through the normal tooltip and narration APIs.
+- P2P attunement checks Build on the existing part and any new outward ME connection before replacement.
+- Monitor configuration, facade installation, and physical view-cell changes in shared terminals require Build. Permitted conversion-monitor deposits and withdrawals remain available without Build.
+- Owners can wrench their own terminal through the normal interaction event to resolve a conflicting grid.
+- Partial craft-output collection through wired and wireless storage wrappers spends the allowance exactly once.
+- Part-click packets validate loaded chunks and interaction reach. Wireless Terminals shortcuts refresh their existing range and quantum-link checks before accessing a cached grid.
+
+### Removed
+
+- The unreleased ME Secure Drive, its PIN system, packets, and resources. Development-world Secure Drive blocks and items are not migrated.
+
+### Compatibility
+
+- Client and server must both use this candidate; its payload protocol is version 5.
+- Existing terminal policies, trust entries, and completed-crafting allowances retain their save format.
+
+
+## 1.1.0-dev.1 — unreleased development candidate
+
+### Added
+
+- Craft-only players can collect their own successfully completed autocrafting outputs, limited to the exact final item or fluid and requested amount, with persistent per-player allowances.
+- Craftable ME Secure Drive with AE2 drive storage, a four-digit PIN keypad, and the standard ME Drive inventory layout after unlock.
+- PIN-gated storage-cell and priority controls for the network owner and Build-trusted players, with bounded background PIN work and per-player cooldowns.
+- Secure Drive owner-only mining and wrench removal, terminal identity binding, and final-owner recovery after terminal removal.
+- Server-side player search and bounded directory pages, including players beyond the former snapshot limit.
+
+### Fixed
+
+- Drive menus now close when the player moves away or the block entity is replaced, and PIN results cannot revive a stale opening.
+- PIN and policy actions report server results in their screens. Priority changes require a valid signed integer and a deliberate save.
+- Secure Drive default naming, icon, mining tag, and background rendering now match their intended AE2 integration.
+- The terminal keeps its selected player aligned with the visible search page and preserves transfer confirmation across unrelated directory updates.
 
 ### Compatibility
 
