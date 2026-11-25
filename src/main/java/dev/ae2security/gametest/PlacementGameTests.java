@@ -98,6 +98,8 @@ public final class PlacementGameTests {
         level.setBlockAndUpdate(chest, AEBlocks.ME_CHEST.block().defaultBlockState());
         level.setBlockAndUpdate(iface, AEBlocks.INTERFACE.block().defaultBlockState());
         level.setBlockAndUpdate(publicChest, AEBlocks.ME_CHEST.block().defaultBlockState());
+        // The template has a barrier here; the plane must reach the security check, not fail inside AE2.
+        level.setBlockAndUpdate(chest.north(), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
         helper.runAfterDelay(20, () -> {
             helper.assertTrue(SecurityHardware.protectedBlock(level, chest) && SecurityHardware.protectedBlock(level, iface),
                     "fixture chest and interface must be protected");
