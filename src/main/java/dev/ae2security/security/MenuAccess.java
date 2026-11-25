@@ -64,6 +64,24 @@ public enum MenuAccess {
         return holder != null && holder.is(tag);
     }
 
+    /**
+     * The permission bits whose loss makes an open menu of this kind unusable. Losing any other bit leaves the
+     * screen fully usable, so it stays open. Add a new permission bit here when a menu kind starts relying on it.
+     */
+    public int relevantPermissions() {
+        return switch (this) {
+            case STORAGE -> Permission.VIEW.bit() | Permission.INSERT.bit() | Permission.EXTRACT.bit();
+            case CRAFTING_REQUEST, STATUS -> Permission.CRAFT.bit() | Permission.VIEW.bit();
+            case HARDWARE, FALLBACK -> Permission.BUILD.bit() | Permission.VIEW.bit();
+            case OWNER -> 0; // Ownership changes are caught by the menu failing to reopen.
+        };
+    }
+
+    /** True when going from {@code before} to {@code after} removes a bit this menu kind depends on. */
+    public boolean lostRelevant(int before, int after) {
+        return (before & ~after & relevantPermissions()) != 0;
+    }
+
     public boolean needsBuild() {
         return this == HARDWARE || this == FALLBACK;
     }
