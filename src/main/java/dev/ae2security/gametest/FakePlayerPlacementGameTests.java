@@ -36,6 +36,9 @@ public final class FakePlayerPlacementGameTests {
         var pos = helper.absolutePos(CENTER);
         var machine = FakePlayerFactory.get(level, new GameProfile(UUID.randomUUID(), "deployer"));
         var real = helper.makeMockServerPlayerInLevel();
+        // Keep the connection but leave the broadcast list, or concurrent tests send AE2 packets to it.
+        level.getServer().getPlayerList().remove(real);
+        real.setPos(Vec3.atCenterOf(pos).add(6, 0, 6));
         helper.assertFalse(real instanceof FakePlayer, "the mock player must not be a FakePlayer");
         machine.setPos(Vec3.atCenterOf(pos));
         if (PartHelper.setPart(level, pos, null, real, AEParts.GLASS_CABLE.item(AEColor.TRANSPARENT)) == null) {

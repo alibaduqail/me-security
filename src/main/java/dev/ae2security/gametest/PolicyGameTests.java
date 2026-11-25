@@ -96,6 +96,9 @@ public final class PolicyGameTests {
         var position = helper.absolutePos(TERMINAL_POS);
         // Item use of a Security Terminal needs a real player: fake players are refused.
         var owner = helper.makeMockServerPlayerInLevel();
+        // Keep the connection but leave the broadcast list, or concurrent tests send AE2 packets to it.
+        level.getServer().getPlayerList().remove(owner);
+        owner.setPos(Vec3.atCenterOf(position).add(6, 0, 6));
         var outsider = player(level, "GhostOutsider", position);
         placeCable(level, position, owner);
         helper.runAfterDelay(20, () -> {
