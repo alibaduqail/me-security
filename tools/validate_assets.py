@@ -115,7 +115,7 @@ def main() -> None:
     for guide in (RESOURCES / "assets/ae2security/ae2guide").glob("*.md"):
         for target in re.findall(r'\]\(ae2security:([^)]*\.md)\)', guide.read_text(encoding="utf-8")):
             assert (guide.parent / target).is_file(), f"{guide}: missing linked page {target}"
-    print(f"Validated {len(json_files)} JSON resources and terminal layers")
+    print(f"Validated {len(json_files)} JSON resources, terminal layers, and translations")
 
 
 if __name__ == "__main__":

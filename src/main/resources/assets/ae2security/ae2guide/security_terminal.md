@@ -51,11 +51,21 @@ subsequent actions use the new permissions immediately.
 | --- | --- |
 | Insert | Deposit items and fluids, including shift-clicking and fluid containers. |
 | Extract | Withdraw items and fluids, and take network ingredients for manual crafting. |
-| Craft | Request autocrafting and pause or cancel jobs. Collecting finished products still requires Extract. |
-| Build | Place, remove, and recolor AE2 cables and cable parts attached to this network. |
+| Craft | Request autocrafting, pause or cancel jobs, and collect your own completed final products up to the requested quantity. |
+| Build | Place, remove, recolor, and configure native AE2 network hardware, including physical storage cells. |
 
-Trust always includes viewing access. Build does not grant Insert, Extract, or Craft.
+Trust always includes viewing access. Build does not grant terminal Insert, Extract, or Craft,
+but it grants full hardware trust: a builder can remove storage cells and access their contents.
 Pattern management and changing security settings remain owner-only.
+
+Craft-only collection is available once your entire autocrafting job finishes
+successfully. Withdraw the final item or fluid from storage as usual. You can take
+up to the requested amount; collecting it spends that allowance. Allowances survive
+server restarts and apply only to your own jobs on this protected network, while
+you still have Craft permission. Canceled jobs, intermediate ingredients, and
+byproducts do not grant an allowance. Jobs started before this feature was
+installed have no recorded allowance. Manual crafting still needs Extract for
+network ingredients.
 
 ## How Build works
 
@@ -84,7 +94,10 @@ Wireless terminals still use AE2's normal pairing, range, and quantum-link rules
 Holding a paired terminal does not grant access. The same permissions apply to
 supported AE2 Wireless Terminals devices.
 
-Normal machine automation continues. Autocrafting jobs already accepted by a CPU
+Normal item and fluid automation continues. Physical disks in ME Drives, ME Chests,
+ME IO Ports, and Spatial IO Ports must be inserted or removed manually with Build
+permission. Hoppers and buses cannot move those disks on protected networks. IO Ports
+still process disks placed in them manually. Autocrafting jobs already accepted by a CPU
 continue even if their initiating player later loses permission.
 
 ## Disconnections and conflicts
@@ -101,10 +114,19 @@ terminal is removed. Each owner can still open their own terminal's management s
 Removing the Security Terminal ends its policy. Its dropped item is fresh and binds
 to the player who next places it.
 
+## Hardware and explosion protection
+
+Ordinary drives, controllers, crafting CPUs, quantum bridges, spatial devices, cables,
+and cable parts on the network require Build permission for mining, wrench removal,
+rotation, configuration, and upgrades. Device menus recheck permissions on every action
+and close when their host is replaced or the player moves out of reach.
+
+Protected network hardware and the Security Terminal's whole cable-bus block survive
+explosions. Public devices remain destructible. Protection follows network membership;
+it does not depend on power or channels.
+
 ## Protection limits
 
-This addon controls supported player access paths and cable parts. It is not a land
-claim: standalone network blocks such as drives and controllers, removable storage
-cells, external inventories, machine outputs, explosions, and other mods' tools are
-outside its physical protection scope. Protect your base separately if you need those
-covered.
+Coverage applies to native AE2 network hardware. Arbitrary third-party tools or movers,
+administrative commands, external inventories, and machine outputs remain outside
+its protection scope.

@@ -35,7 +35,9 @@ Final distribution artifact: `build/libs/ae2security-1.0.0.jar` (116 KiB)
 
 SHA-256: `26b9c4189ccf4dddc242bcd6279b52dcbd6d5e85997bbafe1c1155bcd77cf5a4`
 
-The detailed code findings fixed during the final audit are recorded in [review-2026-09-19.md](review-2026-09-19.md).
+This is historical evidence for 1.0.0 only. The original referenced review file is absent
+from this repository; the later [2026-09-27 audit](polish-audit-and-implementation-plan-2026-09-27.md)
+assesses the unreleased Secure Drive work separately.
 
 ## Dependency advisory assessment
 

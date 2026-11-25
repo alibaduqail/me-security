@@ -5,11 +5,38 @@
   "plugin": "dev.ae2security.mixin.SecurityMixinPlugin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
-    "InWorldGridNodeAccessor", "NetworkStorageMixin", "MenuTypeBuilderMixin", "PartPlacementMixin",
-    "CableBusBlockEntityMixin", "CablePartMixin",
-    "AEBaseMenuMixin", "MenuBroadcastMixin", "MEStorageMenuMixin", "MenuInventoryMixin",
-    "PatternAccessMenuMixin", "CraftingCPUMenuMixin", "CraftingServiceMixin",
-    "CraftingCpuLogicMixin", "ServerboundPacketMixin"
+    "InWorldGridNodeAccessor",
+    "NetworkStorageMixin",
+    "MenuTypeBuilderMixin",
+    "PartPlacementMixin",
+    "CableBusBlockEntityMixin",
+    "CablePartMixin",
+    "AEBaseMenuMixin",
+    "MenuBroadcastMixin",
+    "MEStorageMenuMixin",
+    "MenuInventoryMixin",
+    "PatternAccessMenuMixin",
+    "CraftingCPUMenuMixin",
+    "CraftingServiceMixin",
+    "CraftingCpuLogicMixin",
+    "ServerboundPacketMixin",
+    "AEBaseBlockEntityMixin",
+    "ExposedInventoryMixin",
+    "BlockItemMixin",
+    "WrenchHookMixin",
+    "CraftingUnitBlockMixin",
+    "PatternProviderBlockMixin",
+    "ColorableBlockEntityMixin",
+    "P2PTunnelPartMixin",
+    "MonitorPartMixin",
+    "PartLeftClickPacketMixin",
+    "RestrictedInputSlotMixin",
+    "ConfigButtonPacketMixin",
+    "StorageBusPartMixin",
+    "ItemPickupStrategyMixin",
+    "TinyTNTPrimedEntityMixin"
   ],
-  "injectors": { "defaultRequire": 1 }
+  "injectors": {
+    "defaultRequire": 1
+  }
 }
