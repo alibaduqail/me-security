@@ -40,6 +40,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.neoforge.common.util.FakePlayer;
 
 /** Authorizes player-driven AE2 multipart placement before AE2 changes the world. */
 public final class SecurityPlacement {
@@ -52,6 +53,11 @@ public final class SecurityPlacement {
 
         var stack = context.getItemInHand();
         if (!(stack.getItem() instanceof IPartItem<?> partItem)) return true;
+        // A machine (e.g. a deployer) would become the terminal's owner, and no real player could manage it.
+        if (stack.getItem() == MESecurity.TERMINAL_ITEM.get() && player instanceof FakePlayer) {
+            SecurityAccess.notice(player, Component.translatable("message.ae2security.fake_player_terminal"));
+            return false;
+        }
         var placement = PartPlacement.getPartPlacement(player, level, stack, context.getClickedPos(),
                 context.getClickedFace(), context.getClickLocation());
         if (placement == null) return true; // Let AE2 report its normal placement failure.
@@ -141,7 +147,52 @@ public final class SecurityPlacement {
             return false;
         }
 
+        if (!allowClaims(grids, player, placingSecurityTerminal, terminalIds.size())) {
+            SecurityAccess.notice(player, Component.translatable("message.ae2security.claim_denied"));
+            return false;
+        }
+
         return allowBuild(grids, player);
+    }
+
+    /**
+     * Securing or absorbing an existing unprotected network is a claim, so it requires having helped build it.
+     * Placing a terminal needs ownership of a node somewhere in the touched grids; a cable that would merge a
+     * protected grid with an unprotected one needs ownership in each unprotected grid. Grids where no node has
+     * a recorded owner (machine-placed hardware, very old worlds) stay open to everyone.
+     */
+    private static boolean allowClaims(Set<IGrid> grids, Player player, boolean placingSecurityTerminal,
+            int terminalCount) {
+        if (grids.isEmpty()) return true;
+        var id = player.getUUID();
+        if (placingSecurityTerminal) return ownsOrUnowned(grids, id);
+        if (terminalCount != 1) return true;
+        for (var grid : grids) {
+            if (grid.getService(ISecurityGrid.class).terminalIds().isEmpty() && !ownsOrUnowned(Set.of(grid), id)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * True if the player owns a node in the grids, or no node in them has an owner at all. This scans whole
+     * grids, which is acceptable because it only runs on terminal placement and unprotected-grid merges; it
+     * exits on the first match.
+     */
+    private static boolean ownsOrUnowned(Set<IGrid> grids, UUID id) {
+        boolean anyNodes = false;
+        boolean anyOwner = false;
+        for (var grid : grids) {
+            for (var node : grid.getNodes()) {
+                anyNodes = true;
+                var owner = node.getOwningPlayerProfileId();
+                if (owner == null) continue;
+                if (owner.equals(id)) return true;
+                anyOwner = true;
+            }
+        }
+        return !anyNodes || !anyOwner;
     }
 
     /** Undo the client's predicted part/host when authorization rejects a use-on action. */
