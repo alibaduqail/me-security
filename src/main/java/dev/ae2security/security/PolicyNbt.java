@@ -25,12 +25,22 @@ public final class PolicyNbt {
     }
 
     public static SecurityPolicy read(CompoundTag tag) {
+        return read(tag, false);
+    }
+
+    /**
+     * @param craftImpliesCollect true for data written before Collect existed (saved-data format 3 or older):
+     *        collecting crafted output used to be part of Craft, so those entries keep that behavior
+     */
+    public static SecurityPolicy read(CompoundTag tag, boolean craftImpliesCollect) {
         if (!tag.hasUUID("owner")) throw new IllegalArgumentException("Security policy has no owner");
         var entries = new HashMap<UUID, Integer>();
         for (var element : tag.getList("trusted", Tag.TAG_COMPOUND)) {
             var row = (CompoundTag) element;
             if (!row.hasUUID("player")) throw new IllegalArgumentException("Trusted entry has no UUID");
-            entries.put(row.getUUID("player"), row.getInt("permissions"));
+            int permissions = row.getInt("permissions");
+            if (craftImpliesCollect && Permission.CRAFT.in(permissions)) permissions |= Permission.COLLECT.bit();
+            entries.put(row.getUUID("player"), permissions);
         }
         return new SecurityPolicy(tag.getUUID("owner"), entries, tag.getLong("revision"));
     }

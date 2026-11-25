@@ -51,18 +51,20 @@ subsequent actions use the new permissions immediately.
 | --- | --- |
 | Insert | Deposit items and fluids, including shift-clicking and fluid containers. |
 | Extract | Withdraw items and fluids, and take network ingredients for manual crafting. |
-| Craft | Request autocrafting, pause or cancel jobs, and collect your own completed final products up to the requested quantity. |
+| Craft | Request autocrafting and pause or cancel jobs. Does not allow withdrawing the results. |
+| Collect | Withdraw your own completed final products up to the requested quantity, without Extract. With reversible patterns this can turn network stock into withdrawable items. |
 | Build | Place, remove, recolor, and configure AE2 network hardware, including add-on devices and physical storage cells. |
 
-Trust always includes viewing access. Build does not grant terminal Insert, Extract, or Craft,
+Trust always includes viewing access. Build does not grant terminal Insert, Extract, Craft, or Collect,
 but it grants full hardware trust: a builder can remove storage cells and access their contents.
 Pattern management and changing security settings remain owner-only.
 
-Craft-only collection is available once your entire autocrafting job finishes
-successfully. Withdraw the final item or fluid from storage as usual. You can take
-up to the requested amount; collecting it spends that allowance. Allowances survive
-server restarts and apply only to your own jobs on this protected network, while
-you still have Craft permission. Canceled jobs, intermediate ingredients, and
+Collect-only withdrawal is available once your entire autocrafting job (started
+with Craft) finishes successfully. Withdraw the final item or fluid from storage as
+usual. You can take up to the requested amount; collecting it spends that allowance.
+Allowances survive server restarts and apply only to your own jobs on this protected
+network, and you need Collect permission when withdrawing. Craft alone does not
+let you take the result. Canceled jobs, intermediate ingredients, and
 byproducts do not grant an allowance. Jobs started before this feature was
 installed have no recorded allowance. Manual crafting still needs Extract for
 network ingredients.

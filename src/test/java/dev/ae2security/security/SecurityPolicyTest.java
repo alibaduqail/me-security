@@ -25,7 +25,7 @@ class SecurityPolicyTest {
         var policy = SecurityPolicy.create(OWNER).trust(OWNER, TRUSTED, 0);
         assertTrue(policy.allows(TRUSTED, Permission.VIEW));
         assertEquals(Permission.VIEW.bit(), policy.permissions(TRUSTED));
-        assertEquals(List.of(Permission.INSERT, Permission.EXTRACT, Permission.CRAFT, Permission.BUILD),
+        assertEquals(List.of(Permission.INSERT, Permission.EXTRACT, Permission.CRAFT, Permission.COLLECT, Permission.BUILD),
                 Permission.editable());
     }
     @Test void ownerIsNotAnEditableTrustedEntry() {
@@ -63,12 +63,33 @@ class SecurityPolicyTest {
         assertFalse(policy.allows(TRUSTED, Permission.INSERT));
         assertFalse(policy.allows(TRUSTED, Permission.BUILD));
     }
+    @Test void craftAndCollectAreIndependent() {
+        var craft = SecurityPolicy.create(OWNER).trust(OWNER, TRUSTED, Permission.CRAFT.bit());
+        assertFalse(craft.allows(TRUSTED, Permission.COLLECT));
+        var collect = SecurityPolicy.create(OWNER).trust(OWNER, TRUSTED, Permission.COLLECT.bit());
+        assertTrue(collect.allows(TRUSTED, Permission.COLLECT));
+        assertFalse(collect.allows(TRUSTED, Permission.CRAFT));
+        assertFalse(collect.allows(TRUSTED, Permission.EXTRACT));
+    }
+    @Test void permissionBitsAreStableAndNormalizeMasksUnknownBits() {
+        assertEquals(1, Permission.VIEW.bit());
+        assertEquals(2, Permission.INSERT.bit());
+        assertEquals(4, Permission.EXTRACT.bit());
+        assertEquals(8, Permission.CRAFT.bit());
+        assertEquals(16, Permission.BUILD.bit());
+        assertEquals(32, Permission.COLLECT.bit());
+        assertEquals(63, Permission.ALL);
+        assertEquals(Permission.ALL, Permission.normalize(0xFF));
+        assertEquals(Permission.VIEW.bit() | Permission.COLLECT.bit(), Permission.normalize(Permission.COLLECT.bit()));
+        assertEquals(Permission.VIEW.bit(), Permission.normalize(64));
+    }
     @Test void buildDoesNotGrantStorageOrCraftingAccess() {
         var policy = SecurityPolicy.create(OWNER).trust(OWNER, TRUSTED, Permission.VIEW.bit() | Permission.BUILD.bit());
         assertTrue(policy.allows(TRUSTED, Permission.BUILD));
         assertFalse(policy.allows(TRUSTED, Permission.INSERT));
         assertFalse(policy.allows(TRUSTED, Permission.EXTRACT));
         assertFalse(policy.allows(TRUSTED, Permission.CRAFT));
+        assertFalse(policy.allows(TRUSTED, Permission.COLLECT));
     }
     @Test void constructorCopiesItsInputAndMasksFutureBits() {
         var entries = new HashMap<UUID, Integer>();
