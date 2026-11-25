@@ -3,7 +3,6 @@
   "item.ae2security.security_terminal": "ME Security Terminal",
   "message.ae2security.denied": "Access denied: you do not have permission for this ME network action.",
   "message.ae2security.build_denied": "Access denied: you need Build permission to add or recolor parts on this ME network.",
-  "message.ae2security.break_denied": "Access denied: you do not have permission to remove parts from this ME network.",
   "message.ae2security.terminal_break_owner": "Only the owner can remove this Security Terminal.",
   "message.ae2security.one_terminal": "Only one ME Security Terminal can be connected to an ME network.",
   "message.ae2security.conflict": "Access denied: multiple security terminals are connected. Remove the extra terminals.",
