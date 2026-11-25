@@ -11,6 +11,40 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class MenuAccessTest {
+    @Test void relevantPermissionsPerMenuKind() {
+        int view = Permission.VIEW.bit(), insert = Permission.INSERT.bit(), extract = Permission.EXTRACT.bit();
+        int craft = Permission.CRAFT.bit(), build = Permission.BUILD.bit();
+        assertEquals(view | insert | extract, MenuAccess.STORAGE.relevantPermissions());
+        assertEquals(craft | view, MenuAccess.CRAFTING_REQUEST.relevantPermissions());
+        assertEquals(craft | view, MenuAccess.STATUS.relevantPermissions());
+        assertEquals(build | view, MenuAccess.HARDWARE.relevantPermissions());
+        assertEquals(build | view, MenuAccess.FALLBACK.relevantPermissions());
+        assertEquals(0, MenuAccess.OWNER.relevantPermissions());
+    }
+
+    @Test void losingAnUnrelatedBitKeepsTheMenuOpen() {
+        int all = Permission.ALL;
+        assertFalse(MenuAccess.STORAGE.lostRelevant(all, all & ~Permission.CRAFT.bit()));
+        assertFalse(MenuAccess.STORAGE.lostRelevant(all, all & ~Permission.BUILD.bit()));
+        assertTrue(MenuAccess.STORAGE.lostRelevant(all, all & ~Permission.EXTRACT.bit()));
+        assertTrue(MenuAccess.STORAGE.lostRelevant(all, all & ~Permission.INSERT.bit()));
+        assertTrue(MenuAccess.CRAFTING_REQUEST.lostRelevant(all, all & ~Permission.CRAFT.bit()));
+        assertFalse(MenuAccess.CRAFTING_REQUEST.lostRelevant(all, all & ~Permission.EXTRACT.bit()));
+        assertTrue(MenuAccess.HARDWARE.lostRelevant(all, all & ~Permission.BUILD.bit()));
+        assertFalse(MenuAccess.HARDWARE.lostRelevant(all, all & ~Permission.CRAFT.bit()));
+        assertFalse(MenuAccess.OWNER.lostRelevant(all, 0));
+    }
+
+    @Test void gainingBitsNeverCountsAsLoss() {
+        for (var access : MenuAccess.values()) assertFalse(access.lostRelevant(Permission.VIEW.bit(), Permission.ALL));
+    }
+
+    @Test void removingTrustLosesEveryRelevantBitOfEveryKind() {
+        for (var access : MenuAccess.values()) {
+            if (access != MenuAccess.OWNER) assertTrue(access.lostRelevant(Permission.ALL, 0), access.name());
+        }
+    }
+
     @Test void ownerWinsOverEveryOtherClassification() {
         assertEquals(MenuAccess.OWNER, MenuAccess.classify(true, true, true, true, true));
     }
