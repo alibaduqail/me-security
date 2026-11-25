@@ -42,6 +42,10 @@ public final class SecuritySavedData extends SavedData {
     private final Map<UUID, SecurityPolicy> policies = new HashMap<>();
     private final Map<UUID, Set<ChunkKey>> footprints = new HashMap<>();
     private final Set<UUID> retired = new HashSet<>();
+    /** Canonical location of each live policy's terminal; absent means unknown (older data). */
+    private final Map<UUID, TerminalLocation> locations = new HashMap<>();
+    /** Where each identity's parts are currently in the world. Server lifetime only, never saved. */
+    private final Map<UUID, Set<TerminalLocation>> inWorld = new HashMap<>();
     private final Map<UUID, String> players = new HashMap<>();
     private final Map<UUID, String> playersView = Collections.unmodifiableMap(players);
     private record CraftedOutput(UUID terminal, UUID player, AEKey key) {}
@@ -106,11 +110,38 @@ public final class SecuritySavedData extends SavedData {
     }
 
     public void create(UUID terminal, UUID owner) {
+        create(terminal, SecurityPolicy.create(owner));
+    }
+
+    /** Also used to give a copied terminal its own policy with the original's owner and trust. */
+    public void create(UUID terminal, SecurityPolicy policy) {
         if (policies.containsKey(terminal) || retired.contains(terminal)) {
             throw new IllegalStateException("Security terminal identity already exists");
         }
-        policies.put(terminal, SecurityPolicy.create(owner));
+        policies.put(terminal, policy);
         setDirty();
+    }
+
+    public TerminalLocation location(UUID terminal) { return locations.get(terminal); }
+
+    public void setLocation(UUID terminal, TerminalLocation location) {
+        if (!policies.containsKey(terminal)) return;
+        if (!location.equals(locations.put(terminal, location))) setDirty();
+    }
+
+    public void markInWorld(UUID terminal, TerminalLocation location) {
+        inWorld.computeIfAbsent(terminal, key -> new HashSet<>()).add(location);
+    }
+
+    public void markOutOfWorld(UUID terminal, TerminalLocation location) {
+        var where = inWorld.get(terminal);
+        if (where != null && where.remove(location) && where.isEmpty()) inWorld.remove(terminal);
+    }
+
+    /** A copy; entries can be stale and must be checked against the world. */
+    public List<TerminalLocation> inWorldLocations(UUID terminal) {
+        var where = inWorld.get(terminal);
+        return where == null ? List.of() : List.copyOf(where);
     }
 
     public void update(UUID terminal, SecurityPolicy policy) {
@@ -138,6 +169,7 @@ public final class SecuritySavedData extends SavedData {
     public void retire(UUID terminal) {
         policies.remove(terminal);
         footprints.remove(terminal);
+        locations.remove(terminal);
         retired.add(terminal);
         craftedOutputs.keySet().removeIf(claim -> claim.terminal().equals(terminal));
         setDirty();
@@ -180,6 +212,12 @@ public final class SecuritySavedData extends SavedData {
                     chunks.add(new ChunkKey(chunk.getString("dimension"), chunk.getInt("x"), chunk.getInt("z")));
                 }
                 data.footprints.put(id, chunks);
+                if (row.contains("location")) {
+                    var location = row.get("location") instanceof CompoundTag compound ? TerminalLocation.read(compound) : null;
+                    // Optional: an unreadable location is treated like one never recorded.
+                    if (location == null) LOGGER.warn("Ignoring an unreadable location for terminal {} in {}", id, FILE);
+                    else data.locations.put(id, location);
+                }
             }
             for (var element : strictList(tag, "retired", Tag.TAG_INT_ARRAY)) data.retired.add(NbtUtils.loadUUID(element));
         } catch (RuntimeException e) {
@@ -236,6 +274,8 @@ public final class SecuritySavedData extends SavedData {
                 chunks.add(chunk);
             }
             row.put("chunks", chunks);
+            var location = locations.get(id);
+            if (location != null) row.put("location", location.write());
             entries.add(row);
         });
         tag.put("policies", entries);

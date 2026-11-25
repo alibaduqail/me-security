@@ -114,6 +114,11 @@ terminal is removed. Each owner can still open their own terminal's management s
 Removing the Security Terminal ends its policy. Its dropped item is fresh and binds
 to the player who next places it.
 
+A terminal copied with its block data, for example by a structure template or a world
+editor, becomes a separate terminal with the original's owner and trusted players.
+Removing the copy does not end the original's policy. Moving a terminal with Spatial IO
+keeps it the same terminal.
+
 ## Hardware and explosion protection
 
 Ordinary drives, controllers, crafting CPUs, quantum bridges, spatial devices, cables,
