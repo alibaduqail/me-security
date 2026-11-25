@@ -39,8 +39,20 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
     private static final int SEARCH_FIELD_LEFT_INSET = 3;
     private static final int SEARCH_FIELD_RIGHT_INSET = 5;
     private static final int AE_TEXT_FIELD_TEXTURE_SIZE = 128;
-    private static final int PERMISSION_TOP = 58;
-    private static final int PERMISSION_ROW_HEIGHT = 22;
+    // Vertical layout of the right-hand panel (y relative to the screen, inset panel is 38..226):
+    //   heading text 43..51; permission buttons 54 + 21 * row, 20 high: 54..74, 75..95, 96..116, 117..137, 138..158
+    //   trust button 160..178; transfer prompt / edit status text 180..188; name field 190..202;
+    //   transfer button 204..222. The player list pager (left panel) shares the 204..222 band.
+    private static final int PERMISSION_TOP = 54;
+    private static final int PERMISSION_ROW_HEIGHT = 21;
+    private static final int TRUST_BUTTON_Y = 160;
+    private static final int TRUST_BUTTON_Y_UNTRUSTED = 116;
+    private static final int TRANSFER_TEXT_Y = 180;
+    private static final int TRANSFER_NAME_Y = 190;
+    private static final int TRANSFER_BUTTON_Y = 204;
+    private static final int PLAYER_ROW_TOP = 74;
+    private static final int PLAYER_ROW_PITCH = 21;
+    private static final int PAGER_Y = 204;
     private static final ResourceLocation AE_TEXT_FIELD_TEXTURE =
             ResourceLocation.fromNamespaceAndPath("ae2", "textures/guis/text_field.png");
 
@@ -74,7 +86,7 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         super(menu, inventory, title);
         this.style = StyleManager.loadStyleDoc("/screens/terminals/base_terminal.json");
         imageWidth = 304;
-        imageHeight = 218;
+        imageHeight = 232;
     }
 
     @Override
@@ -109,12 +121,12 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         for (int row = 0; row < PAGE_SIZE; row++) {
             int rowIndex = row;
             playerButtons[row] = addRenderableWidget(new PlayerButton(
-                    leftPos + 12, topPos + 74 + row * 18, PLAYER_LIST_WIDTH, 17, Component.empty(),
+                    leftPos + 12, topPos + PLAYER_ROW_TOP + row * PLAYER_ROW_PITCH, PLAYER_LIST_WIDTH, 17, Component.empty(),
                     button -> selectVisiblePlayer(rowIndex)));
         }
 
-        previousPageButton = ae2Button(12, 186, 34, 18, Component.literal("<"), () -> turnPage(-1));
-        nextPageButton = ae2Button(118, 186, 34, 18, Component.literal(">"), () -> turnPage(1));
+        previousPageButton = ae2Button(12, PAGER_Y, 34, 18, Component.literal("<"), () -> turnPage(-1));
+        nextPageButton = ae2Button(118, PAGER_Y, 34, 18, Component.literal(">"), () -> turnPage(1));
 
         for (int row = 0; row < Permission.editable().size(); row++) {
             var permission = Permission.editable().get(row);
@@ -127,8 +139,8 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
             permissionButtons.put(permission, addRenderableWidget(button));
         }
 
-        trustButton = ae2Button(164, 147, 128, 18, Component.empty(), this::toggleTrust);
-        transferName = addRenderableWidget(new AETextField(style, font, leftPos + 164, topPos + 176, 128, 12));
+        trustButton = ae2Button(164, TRUST_BUTTON_Y, 128, 18, Component.empty(), this::toggleTrust);
+        transferName = addRenderableWidget(new AETextField(style, font, leftPos + 164, topPos + TRANSFER_NAME_Y, 128, 12));
         transferName.setBordered(false);
         transferName.setMaxLength(64);
         transferName.setPlaceholder(Component.translatable("screen.ae2security.transfer_name"));
@@ -138,7 +150,7 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
             transferInput = value;
             refreshControls();
         });
-        transferButton = ae2Button(164, 190, 128, 18, Component.empty(), this::transferOwnership);
+        transferButton = ae2Button(164, TRANSFER_BUTTON_Y, 128, 18, Component.empty(), this::transferOwnership);
         transferButton.setTooltip(Tooltip.create(Component.translatable("screen.ae2security.transfer_warning")));
 
         displayed = menu.snapshot();
@@ -158,6 +170,7 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
             case INSERT -> Icon.ACCESS_WRITE;
             case EXTRACT -> Icon.ACCESS_READ;
             case CRAFT -> Icon.CRAFT_HAMMER;
+            case COLLECT -> Icon.AUTO_EXPORT_ON;
             case BUILD -> Icon.PLACEMENT_ITEM;
         };
     }
@@ -261,7 +274,7 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         trustButton.setMessage(Component.translatable(pending
                 ? "screen.ae2security.pending"
                 : trusted ? "screen.ae2security.remove" : "screen.ae2security.trust"));
-        trustButton.setY(topPos + (trusted ? 147 : 116));
+        trustButton.setY(topPos + (trusted ? TRUST_BUTTON_Y : TRUST_BUTTON_Y_UNTRUSTED));
         trustButton.visible = player != null;
         trustButton.active = player != null && !pending && !searchPending;
 
@@ -353,8 +366,8 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         int y = topPos;
 
         drawRaisedPanel(graphics, x, y, imageWidth, imageHeight);
-        drawInsetPanel(graphics, x + 7, y + 38, 151, 174);
-        drawInsetPanel(graphics, x + 159, y + 38, 138, 174);
+        drawInsetPanel(graphics, x + 7, y + 38, 151, 188);
+        drawInsetPanel(graphics, x + 159, y + 38, 138, 188);
     }
 
     private static void drawRaisedPanel(GuiGraphics graphics, int x, int y, int width, int height) {
@@ -410,14 +423,15 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
             }
         }
 
-        if (selectedPlayer != null && selectedPlayer.id().equals(transferConfirmation)) {
+        // The prompt and the edit status share one line; the status wins while an edit is pending.
+        if (selectedPlayer != null && selectedPlayer.id().equals(transferConfirmation) && !edits.pending()) {
             var prompt = Component.translatable("screen.ae2security.transfer_prompt", selectedPlayer.name());
-            graphics.drawString(font, font.plainSubstrByWidth(prompt.getString(), 128), 164, 166,
+            graphics.drawString(font, font.plainSubstrByWidth(prompt.getString(), 128), 164, TRANSFER_TEXT_Y,
                     AE2_MUTED_TEXT, false);
         }
 
         String pages = (players.page() + 1) + " / " + (players.lastPage() + 1);
-        graphics.drawCenteredString(font, pages, 82, 191, AE2_DARK);
+        graphics.drawCenteredString(font, pages, 82, PAGER_Y + 5, AE2_DARK);
         if (players.players().isEmpty()) {
             graphics.drawCenteredString(font, Component.translatable(players.searching()
                     ? "screen.ae2security.searching" : "screen.ae2security.no_players"), 82, 98,
@@ -429,7 +443,7 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
             var status = Component.translatable(pending ? "screen.ae2security.pending"
                     : "screen.ae2security.edit_result." + editStatus.name().toLowerCase(Locale.ROOT));
             graphics.drawString(font, font.plainSubstrByWidth(status.getString(), 128),
-                    164, 173, editStatus == PolicyEditResult.Result.APPLIED ? AE2_DARK : STATUS_WARNING, false);
+                    164, TRANSFER_TEXT_Y, editStatus == PolicyEditResult.Result.APPLIED ? AE2_DARK : STATUS_WARNING, false);
         }
 
     }

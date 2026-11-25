@@ -23,6 +23,8 @@ public final class SecuritySavedData extends SavedData {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final String NAME = "ae2security_policies";
     private static final String FILE = "data/" + NAME + ".dat";
+    /** 4 added the Collect permission; older data grants it to every entry that has Craft. */
+    static final int FORMAT = 4;
 
     /**
      * Minecraft catches every Exception thrown while reading saved data, logs it and carries on with an
@@ -165,6 +167,7 @@ public final class SecuritySavedData extends SavedData {
         var data = new SecuritySavedData();
         // Malformed policy or tombstone data is a world error, never a reason to make storage public or
         // to start over empty. It must leave as an Error: see CorruptDataError.
+        boolean craftImpliesCollect = !tag.contains("format", Tag.TAG_ANY_NUMERIC) || tag.getInt("format") < 4;
         try {
             for (var element : strictList(tag, "policies", Tag.TAG_COMPOUND)) {
                 var row = (CompoundTag) element;
@@ -173,7 +176,7 @@ public final class SecuritySavedData extends SavedData {
                 if (!row.contains("policy", Tag.TAG_COMPOUND)) {
                     throw new IllegalArgumentException("terminal " + id + " has no policy");
                 }
-                data.policies.put(id, PolicyNbt.read(row.getCompound("policy")));
+                data.policies.put(id, PolicyNbt.read(row.getCompound("policy"), craftImpliesCollect));
                 var chunks = new HashSet<ChunkKey>();
                 for (var c : row.getList("chunks", Tag.TAG_COMPOUND)) {
                     var chunk = (CompoundTag) c;
@@ -221,7 +224,7 @@ public final class SecuritySavedData extends SavedData {
 
     @Override
     public CompoundTag save(CompoundTag tag, HolderLookup.Provider registries) {
-        tag.putInt("format", 3);
+        tag.putInt("format", FORMAT);
         var entries = new ListTag();
         policies.forEach((id, policy) -> {
             var row = new CompoundTag();

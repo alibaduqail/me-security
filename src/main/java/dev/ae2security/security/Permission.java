@@ -4,10 +4,10 @@ import java.util.List;
 
 /** Stable persisted bits. Never reorder or reuse these values. */
 public enum Permission {
-    VIEW(1), INSERT(2), EXTRACT(4), CRAFT(8), BUILD(16);
+    VIEW(1), INSERT(2), EXTRACT(4), CRAFT(8), BUILD(16), COLLECT(32);
 
-    public static final int ALL = 31;
-    private static final List<Permission> EDITABLE = List.of(INSERT, EXTRACT, CRAFT, BUILD);
+    public static final int ALL = 63;
+    private static final List<Permission> EDITABLE = List.of(INSERT, EXTRACT, CRAFT, COLLECT, BUILD);
     private final int bit;
 
     Permission(int bit) { this.bit = bit; }

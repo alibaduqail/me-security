@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
+import dev.ae2security.security.Permission;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.EncoderException;
@@ -19,7 +20,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 class PayloadCodecTest {
     private static final int MAX_TEXT = 64;
-    private static final String PROTOCOL_VERSION = "5";
+    private static final String PROTOCOL_VERSION = "6";
 
     private static <T> T roundTrip(T value, StreamCodec<RegistryFriendlyByteBuf, T> codec) {
         var buffer = new RegistryFriendlyByteBuf(Unpooled.buffer(), RegistryAccess.EMPTY,
@@ -46,9 +47,21 @@ class PayloadCodecTest {
         var search = new PlayerSearchRequest(4, 72, target.toString(), 1400);
         assertEquals(search, roundTrip(search, PlayerSearchRequest.CODEC));
         var page = new PlayerSearchResult(4, 72, 1400, 9001, false,
-                List.of(new PolicySnapshot.PlayerEntry(target, "Guest", true, 31)));
+                List.of(new PolicySnapshot.PlayerEntry(target, "Guest", true, Permission.ALL)));
         assertEquals(page, roundTrip(page, PlayerSearchResult.CODEC));
 
+    }
+
+    @Test
+    void everyPermissionBitFitsTheSingleByteOnTheWire() {
+        var target = UUID.randomUUID();
+        for (var permission : Permission.values()) {
+            var edit = new EditPolicy(4, 1, 900L, target, EditPolicy.Action.TOGGLE_PERMISSION, permission.bit(), "");
+            assertEquals(edit, roundTrip(edit, EditPolicy.CODEC), permission.name());
+        }
+        var all = new EditPolicy(4, 1, 900L, target, EditPolicy.Action.PERMISSIONS, Permission.ALL, "");
+        assertEquals(Permission.ALL, roundTrip(all, EditPolicy.CODEC).permissions());
+        assertTrue(Permission.ALL <= 0xFF, "permissions are encoded as one unsigned byte");
     }
 
     @Test
