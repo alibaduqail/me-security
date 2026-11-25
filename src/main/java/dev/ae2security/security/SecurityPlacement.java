@@ -40,6 +40,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.neoforge.common.util.FakePlayer;
 
 /** Authorizes player-driven AE2 multipart placement before AE2 changes the world. */
 public final class SecurityPlacement {
@@ -52,6 +53,11 @@ public final class SecurityPlacement {
 
         var stack = context.getItemInHand();
         if (!(stack.getItem() instanceof IPartItem<?> partItem)) return true;
+        // A machine (e.g. a deployer) would become the terminal's owner, and no real player could manage it.
+        if (stack.getItem() == MESecurity.TERMINAL_ITEM.get() && player instanceof FakePlayer) {
+            SecurityAccess.notice(player, Component.translatable("message.ae2security.fake_player_terminal"));
+            return false;
+        }
         var placement = PartPlacement.getPartPlacement(player, level, stack, context.getClickedPos(),
                 context.getClickedFace(), context.getClickLocation());
         if (placement == null) return true; // Let AE2 report its normal placement failure.
