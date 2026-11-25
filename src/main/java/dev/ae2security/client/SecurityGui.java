@@ -92,20 +92,20 @@ final class SecurityGui {
     }
 
     /**
-     * The network's protection state, right-aligned to {@code right}: a closed lock while
-     * protected, an open lock once disconnected (a verified detached network is public), and
-     * AE2's red "invalid" sign for a conflict.
+     * A warning for a network that is not normally protected, right-aligned to {@code right}:
+     * an open lock once disconnected (a verified detached network is public), and AE2's red
+     * "invalid" sign for a conflict. A protected network, the normal state, shows nothing.
      */
-    static void networkStatus(GuiGraphics graphics, ScreenStyle style, Font font, String status, int right, int y) {
-        boolean ok = status.equals("protected");
+    static void networkWarning(GuiGraphics graphics, ScreenStyle style, Font font, String status, int right, int y) {
+        if (status.equals("protected")) return;
         var label = Component.translatable("screen.ae2security." + status);
-        int argb = color(style, ok ? PaletteColor.DEFAULT_TEXT_COLOR : PaletteColor.ERROR);
+        int argb = color(style, PaletteColor.ERROR);
         int textX = right - font.width(label);
         text(graphics, font, label, textX, y, argb);
-        switch (status) {
-            case "protected" -> tintedIcon(graphics, Icon.LOCKED, textX - 15, y - 4, argb);
-            case "disconnected" -> tintedIcon(graphics, Icon.UNLOCKED, textX - 15, y - 4, argb);
-            default -> Icon.INVALID.getBlitter().dest(textX - 17, y - 4).blit(graphics);
+        if (status.equals("disconnected")) {
+            tintedIcon(graphics, Icon.UNLOCKED, textX - 15, y - 4, argb);
+        } else {
+            Icon.INVALID.getBlitter().dest(textX - 17, y - 4).blit(graphics);
         }
     }
 

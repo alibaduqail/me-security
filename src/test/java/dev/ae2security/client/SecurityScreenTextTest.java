@@ -2,12 +2,14 @@ package dev.ae2security.client;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import java.util.UUID;
 
 import dev.ae2security.network.PolicySnapshot;
-import dev.ae2security.security.Permission;
 import net.minecraft.network.chat.contents.TranslatableContents;
 import org.junit.jupiter.api.Test;
 
@@ -24,30 +26,17 @@ class SecurityScreenTextTest {
     }
 
     @Test
-    void grantedCountIgnoresImpliedViewAndUnknownBits() {
-        assertEquals(0, SecurityScreenText.grantedCount(Permission.VIEW.bit()));
-        assertEquals(2, SecurityScreenText.grantedCount(
-                Permission.VIEW.bit() | Permission.INSERT.bit() | Permission.COLLECT.bit()));
-        assertEquals(Permission.editable().size(), SecurityScreenText.grantedCount(Permission.ALL));
-        assertEquals(Permission.editable().size(), SecurityScreenText.grantedCount(-1));
-    }
+    void selectionIsListedByIdEvenWhenItsRowIsStale() {
+        var selected = new PolicySnapshot.PlayerEntry(
+                UUID.fromString("404198aa-cc64-3021-9fdf-8766c0d0096c"), "Guest", true, 3);
+        var staleRow = new PolicySnapshot.PlayerEntry(selected.id(), "Guest", false, 0);
+        var other = new PolicySnapshot.PlayerEntry(
+                UUID.fromString("0f0e3c8a-1b2d-3e4f-8a9b-0c1d2e3f4a5b"), "Other", false, 0);
 
-    @Test
-    void accessSummaryCountsGrantsForTrustedPlayersOnly() {
-        var id = UUID.fromString("404198aa-cc64-3021-9fdf-8766c0d0096c");
-        var trusted = new PolicySnapshot.PlayerEntry(id, "Builder", true,
-                Permission.VIEW.bit() | Permission.CRAFT.bit() | Permission.BUILD.bit());
-        var guest = new PolicySnapshot.PlayerEntry(id, "Guest", false, Permission.ALL);
-
-        var summary = assertInstanceOf(TranslatableContents.class,
-                SecurityScreenText.accessSummary(trusted).getContents());
-        assertEquals("screen.ae2security.summary.trusted", summary.getKey());
-        assertEquals(2, summary.getArgs()[0]);
-        assertEquals(Permission.editable().size(), summary.getArgs()[1]);
-
-        var untrusted = assertInstanceOf(TranslatableContents.class,
-                SecurityScreenText.accessSummary(guest).getContents());
-        assertEquals("screen.ae2security.summary.untrusted", untrusted.getKey());
+        assertTrue(SecurityScreenText.isListed(List.of(other, staleRow), selected));
+        assertFalse(SecurityScreenText.isListed(List.of(other), selected),
+                "a selection kept after trusting moves it to another page is not on this one");
+        assertFalse(SecurityScreenText.isListed(List.of(), selected));
     }
 
     @Test
