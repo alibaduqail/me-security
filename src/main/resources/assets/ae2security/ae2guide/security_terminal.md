@@ -105,7 +105,8 @@ continue even if their initiating player later loses permission.
 Power loss or running out of channels does not disable protection. Policies survive
 chunk unloading and server restarts. After a cable split, a detached network becomes
 public once disconnection can be verified. If needed chunks are unloaded, protection
-is retained until the topology can be checked.
+is retained until the topology can be checked. Chunks the network no longer reaches
+stop counting once they have been checked while loaded together with the terminal.
 
 Normal placement and recoloring cannot merge two Security Terminals into one network.
 If another connection path creates a conflict, player access is denied until an extra
