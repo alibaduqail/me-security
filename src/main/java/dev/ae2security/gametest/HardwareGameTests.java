@@ -231,7 +231,7 @@ public final class HardwareGameTests {
             ((DriveBlockEntity) level.getBlockEntity(center.east())).getInternalInventory().setItemDirect(0, filledCell());
             var data = SecuritySavedData.get(level.getServer());
             var id = terminal.terminalId();
-            data.update(id, data.policy(id).trust(owner.getUUID(), guest.getUUID(), Permission.CRAFT.bit()));
+            data.update(id, data.policy(id).trust(owner.getUUID(), guest.getUUID(), Permission.CRAFT.bit() | Permission.COLLECT.bit()));
             var stack = AEItems.WIRELESS_TERMINAL.stack();
             var item = (appeng.items.tools.powered.WirelessTerminalItem) stack.getItem();
             item.injectAEPower(stack, 10000, Actionable.MODULATE);
@@ -244,7 +244,7 @@ public final class HardwareGameTests {
             var diamond = AEItemKey.of(Items.DIAMOND);
             var source = IActionSource.ofPlayer(guest);
             helper.assertValueEqual(0L, storage.extract(diamond, 1, Actionable.MODULATE, source),
-                    "pairing and Craft do not grant general extraction");
+                    "pairing, Craft and Collect do not grant general extraction");
             data.recordCraftedOutput(id, guest.getUUID(), new appeng.api.stacks.GenericStack(diamond, 3));
             helper.assertValueEqual(1L, storage.extract(diamond, 1, Actionable.MODULATE, source), "wireless permits owned craft output");
             helper.assertValueEqual(2L, data.craftedAmount(id, guest.getUUID(), diamond), "wireless partial collection charges exactly once");

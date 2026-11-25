@@ -7,7 +7,7 @@ public final class SecurityPayloads {
     private SecurityPayloads() {}
 
     public static void register(RegisterPayloadHandlersEvent event) {
-        var registrar = event.registrar("5");
+        var registrar = event.registrar("6");
         registrar.playToServer(EditPolicy.TYPE, EditPolicy.CODEC, (edit, context) -> context.enqueueWork(() -> {
             var player = context.player();
             if (player.containerMenu instanceof SecurityMenu menu && menu.containerId == edit.menuId()) {

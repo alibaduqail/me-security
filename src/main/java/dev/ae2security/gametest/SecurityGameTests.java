@@ -457,8 +457,8 @@ public final class SecurityGameTests {
         helper.runAfterDelay(30, () -> {
             var data = SecuritySavedData.get(level.getServer());
             var id = terminal.terminalId();
-            data.update(id, data.policy(id).trust(owner.getUUID(), crafter.getUUID(), Permission.CRAFT.bit())
-                    .trust(owner.getUUID(), other.getUUID(), Permission.CRAFT.bit()));
+            data.update(id, data.policy(id).trust(owner.getUUID(), crafter.getUUID(), Permission.CRAFT.bit() | Permission.COLLECT.bit())
+                    .trust(owner.getUUID(), other.getUUID(), Permission.CRAFT.bit() | Permission.COLLECT.bit()));
             var grid = terminal.getGridNode().getGrid();
             var mounted = new TestStorage();
             grid.getStorageService().addGlobalStorageProvider(mounts -> mounts.mount(mounted));
@@ -541,10 +541,10 @@ public final class SecurityGameTests {
             helper.assertTrue(cpu.submitJob(grid, plan, source, null).successful(), "third player job submits");
             cpu.insert(diamond, 4, Actionable.MODULATE, machine);
             data.update(id, data.policy(id).trust(owner.getUUID(), crafter.getUUID(), 0));
-            helper.assertValueEqual(0L, network.extract(diamond, 4, Actionable.MODULATE, source), "revoked Craft denies collection");
+            helper.assertValueEqual(0L, network.extract(diamond, 4, Actionable.MODULATE, source), "revoked Collect denies collection");
             data.update(id, data.policy(id).trust(owner.getUUID(), crafter.getUUID(), Permission.EXTRACT.bit()));
             helper.assertValueEqual(4L, network.extract(diamond, 4, Actionable.MODULATE, source), "full Extract still works");
-            data.update(id, data.policy(id).trust(owner.getUUID(), crafter.getUUID(), Permission.CRAFT.bit()));
+            data.update(id, data.policy(id).trust(owner.getUUID(), crafter.getUUID(), Permission.CRAFT.bit() | Permission.COLLECT.bit()));
             helper.assertValueEqual(0L, network.extract(diamond, 1, Actionable.MODULATE, source),
                     "collection with full Extract also consumes the allowance");
 
@@ -586,7 +586,7 @@ public final class SecurityGameTests {
         var second = PartHelper.setPart(level, position.above(), Direction.NORTH, owner, MESecurity.TERMINAL_ITEM.get());
         helper.runAfterDelay(20, () -> {
             var data = SecuritySavedData.get(level.getServer());
-            data.update(first.terminalId(), data.policy(first.terminalId()).trust(owner.getUUID(), crafter.getUUID(), Permission.CRAFT.bit()));
+            data.update(first.terminalId(), data.policy(first.terminalId()).trust(owner.getUUID(), crafter.getUUID(), Permission.CRAFT.bit() | Permission.COLLECT.bit()));
             var grid = first.getGridNode().getGrid();
             var other = second.getGridNode().getGrid();
             var normal = IActionSource.ofPlayer(crafter);

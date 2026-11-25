@@ -260,7 +260,7 @@ public final class AccessGameTests {
         var terminal = terminal(level, hub, Direction.NORTH, owner);
         var storageTerminal = PartHelper.setPart(level, hub, Direction.SOUTH, owner, AEParts.TERMINAL.get());
         helper.runAfterDelay(20, () -> {
-            trust(level, terminal, owner, crafter, Permission.CRAFT.bit());
+            trust(level, terminal, owner, crafter, Permission.CRAFT.bit() | Permission.COLLECT.bit());
             var data = SecuritySavedData.get(level.getServer());
             var id = terminal.terminalId();
             var grid = terminal.getGridNode().getGrid();
