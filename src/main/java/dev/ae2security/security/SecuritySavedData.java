@@ -3,6 +3,7 @@ package dev.ae2security.security;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import appeng.api.stacks.AEKey;
@@ -16,6 +17,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.storage.LevelResource;
 import org.slf4j.Logger;
@@ -40,7 +42,18 @@ public final class SecuritySavedData extends SavedData {
         }
     }
 
-    public record ChunkKey(String dimension, int x, int z) {}
+    /** Parsed dimension ids, by their saved string. Absent means malformed. Bounded by the ids in the saved data. */
+    private static final Map<String, Optional<ResourceKey<Level>>> DIMENSION_KEYS = new ConcurrentHashMap<>();
+
+    public record ChunkKey(String dimension, int x, int z) {
+        /** The dimension as a resource key, parsed once per distinct id, or null when the id is malformed. */
+        public ResourceKey<Level> dimensionKey() {
+            return DIMENSION_KEYS.computeIfAbsent(dimension, id -> {
+                var parsed = ResourceLocation.tryParse(id);
+                return parsed == null ? Optional.empty() : Optional.of(ResourceKey.create(Registries.DIMENSION, parsed));
+            }).orElse(null);
+        }
+    }
     private final Map<UUID, SecurityPolicy> policies = new HashMap<>();
     private final Map<UUID, Set<ChunkKey>> footprints = new HashMap<>();
     private final Set<UUID> retired = new HashSet<>();
@@ -224,8 +237,8 @@ public final class SecuritySavedData extends SavedData {
 
     /** The loaded level a remembered chunk belongs to, or null. */
     public static ServerLevel level(MinecraftServer server, ChunkKey chunk) {
-        var dimension = ResourceLocation.tryParse(chunk.dimension());
-        return dimension == null ? null : server.getLevel(ResourceKey.create(Registries.DIMENSION, dimension));
+        var dimension = chunk.dimensionKey();
+        return dimension == null ? null : server.getLevel(dimension);
     }
 
     /** Whether a chunk is loaded and entity-ticking, so that its grid nodes are live. Never loads a chunk. */
@@ -240,11 +253,11 @@ public final class SecuritySavedData extends SavedData {
      * the world does not list it either. A dimension that is listed but not loaded yet is not gone.
      */
     public static boolean dimensionGone(MinecraftServer server, ChunkKey chunk) {
-        var dimension = ResourceLocation.tryParse(chunk.dimension());
+        var dimension = chunk.dimensionKey();
         if (dimension == null) return true;
-        if (server.getLevel(ResourceKey.create(Registries.DIMENSION, dimension)) != null) return false;
+        if (server.getLevel(dimension) != null) return false;
         return server.registryAccess().registry(Registries.LEVEL_STEM)
-                .map(stems -> !stems.containsKey(dimension)).orElse(true);
+                .map(stems -> !stems.containsKey(dimension.location())).orElse(true);
     }
 
     public static SecuritySavedData load(CompoundTag tag, HolderLookup.Provider registries) {
