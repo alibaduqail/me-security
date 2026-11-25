@@ -1,6 +1,7 @@
 package dev.ae2security.security;
 
 import java.util.*;
+import appeng.api.AECapabilities;
 import appeng.api.networking.*;
 import appeng.api.networking.storage.IStorageService;
 import appeng.me.InWorldGridNode;
@@ -31,6 +32,16 @@ public final class SecurityGridService implements ISecurityGrid, IGridServicePro
     private Set<SecuritySavedData.ChunkKey> chunks;
     private MinecraftServer server;
     private long stableAfter;
+    /** Ticks a remembered chunk outside the footprint must stay ready before it can be forgotten. */
+    static final int SETTLE_TICKS = 40;
+    /** How often a settled chunk that still holds AE2 hardware is scanned again. */
+    private static final int OCCUPIED_RECHECK_TICKS = 20;
+    /** The footprint last reconciled for each present terminal, and what was known then. */
+    private record Reconciled(Set<SecuritySavedData.ChunkKey> footprint, long revision, boolean outside) {}
+    private final Map<UUID, Reconciled> reconciled = new HashMap<>();
+    /** Transient: the tick since which each remembered chunk outside the footprint has been ready. */
+    private final Map<SecuritySavedData.ChunkKey, Long> readySince = new HashMap<>();
+    private long lastSampled = Long.MIN_VALUE;
 
     public SecurityGridService(IGrid grid, IStorageService storage) {
         this.grid = grid;
@@ -126,6 +137,98 @@ public final class SecurityGridService implements ISecurityGrid, IGridServicePro
         return chunks;
     }
 
+    /**
+     * Keeps a present terminal's remembered chunks equal to its current footprint plus the chunks that
+     * cannot yet be shown to hold nothing connected to it. Nothing is written while that stays true.
+     */
+    private void reconcile(SecuritySavedData data, UUID id, Set<SecuritySavedData.ChunkKey> footprint, boolean stable) {
+        var last = reconciled.get(id);
+        if (last != null && last.footprint() == footprint && last.revision() == data.footprintRevision()
+                && !(stable && last.outside())) return;
+        if (stable) {
+            var stored = data.footprint(id);
+            var forget = forgettable(stored, footprint);
+            data.reconcileChunks(id, footprint, forget::contains);
+        } else {
+            data.reconcileChunks(id, footprint, chunk -> false);
+        }
+        reconciled.put(id, new Reconciled(footprint, data.footprintRevision(),
+                data.footprint(id).size() > footprint.size()));
+    }
+
+    /**
+     * The remembered chunks outside the current footprint of this stable grid that may be forgotten.
+     *
+     * <p>Release relies on every remembered chunk being ready, so forgetting one must never hide a chunk
+     * through which a detached piece may still be connected. Being ready and outside the footprint is not
+     * enough on its own: with A(terminal)-B-C-D, B unloaded and C, D loaded, C and D look empty of this grid
+     * although they still connect D to it through B. Forgetting them would release D later, once C unloads
+     * and B loads. A chunk is therefore forgotten only when one of these holds:
+     * <ul>
+     * <li>Its dimension is gone. No node exists there, so no connection can run through it.
+     * <li>It has been ready continuously for {@link #SETTLE_TICKS} and holds no AE2 grid-node host at all.
+     * Nothing can connect through it, so it is the same as a chunk the network never reached.
+     * <li>It has been ready that long, and at the same moment every remembered chunk is ready, the others
+     * outside the footprint for that long too. All chunks the network ever reached are then live, which is
+     * exactly when release already accepts the grid as the whole topology.
+     * </ul>
+     * The settle time covers block entities in a newly ready chunk whose nodes have not joined yet. Readiness
+     * must be seen on consecutive ticks; a tick without a sample restarts every chunk's settle time.
+     */
+    private Set<SecuritySavedData.ChunkKey> forgettable(Set<SecuritySavedData.ChunkKey> stored,
+            Set<SecuritySavedData.ChunkKey> current) {
+        long now = server.getTickCount();
+        if (lastSampled != now && lastSampled != now - 1) readySince.clear();
+        lastSampled = now;
+        var forget = new HashSet<SecuritySavedData.ChunkKey>();
+        List<SecuritySavedData.ChunkKey> occupied = null;
+        boolean allSettled = true;
+        for (var chunk : stored) {
+            if (current.contains(chunk)) continue;
+            if (SecuritySavedData.dimensionGone(server, chunk)) {
+                forget.add(chunk);
+                continue;
+            }
+            if (!SecuritySavedData.chunkReady(server, chunk)) {
+                readySince.remove(chunk);
+                allSettled = false;
+                continue;
+            }
+            long age = now - readySince.computeIfAbsent(chunk, key -> now);
+            if (age < SETTLE_TICKS) {
+                allSettled = false;
+            } else if ((age - SETTLE_TICKS) % OCCUPIED_RECHECK_TICKS == 0 && holdsNoGridHardware(chunk)) {
+                forget.add(chunk);
+            } else {
+                if (occupied == null) occupied = new ArrayList<>();
+                occupied.add(chunk);
+            }
+        }
+        if (allSettled && occupied != null && allReady(current)) forget.addAll(occupied);
+        readySince.keySet().removeIf(chunk -> current.contains(chunk) || !stored.contains(chunk));
+        return forget;
+    }
+
+    private boolean allReady(Set<SecuritySavedData.ChunkKey> chunks) {
+        for (var chunk : chunks) {
+            if (!SecuritySavedData.chunkReady(server, chunk)) return false;
+        }
+        return true;
+    }
+
+    /** True only for a loaded chunk without any block entity that can host an AE2 in-world grid node. */
+    private boolean holdsNoGridHardware(SecuritySavedData.ChunkKey key) {
+        var level = SecuritySavedData.level(server, key);
+        var chunk = level == null ? null : level.getChunkSource().getChunkNow(key.x(), key.z());
+        if (chunk == null) return false;
+        for (var entry : chunk.getBlockEntities().entrySet()) {
+            var blockEntity = entry.getValue();
+            if (blockEntity instanceof IInWorldGridNodeHost || level.getCapability(AECapabilities.IN_WORLD_GRID_NODE_HOST,
+                    entry.getKey(), blockEntity.getBlockState(), blockEntity, null) != null) return false;
+        }
+        return true;
+    }
+
     @Override
     public void onServerEndTick() {
         if (server == null || nodes.isEmpty()) return;
@@ -138,7 +241,9 @@ public final class SecurityGridService implements ISecurityGrid, IGridServicePro
 
         if (!present.isEmpty()) {
             var footprint = chunkFootprint();
-            for (var id : present) data.rememberChunks(id, footprint);
+            boolean stable = server.getTickCount() >= stableAfter;
+            if (reconciled.size() > present.size()) reconciled.keySet().retainAll(present);
+            for (var id : present) reconcile(data, id, footprint, stable);
         }
 
         int beforeRelease = inherited.size();

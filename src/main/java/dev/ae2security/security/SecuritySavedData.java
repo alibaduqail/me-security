@@ -3,6 +3,8 @@ package dev.ae2security.security;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
@@ -14,6 +16,8 @@ import net.minecraft.nbt.*;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.storage.LevelResource;
 import org.slf4j.Logger;
@@ -40,7 +44,18 @@ public final class SecuritySavedData extends SavedData {
         }
     }
 
-    public record ChunkKey(String dimension, int x, int z) {}
+    /** Parsed dimension ids, by their saved string. Absent means malformed. Bounded by the ids in the saved data. */
+    private static final Map<String, Optional<ResourceKey<Level>>> DIMENSION_KEYS = new ConcurrentHashMap<>();
+
+    public record ChunkKey(String dimension, int x, int z) {
+        /** The dimension as a resource key, parsed once per distinct id, or null when the id is malformed. */
+        public ResourceKey<Level> dimensionKey() {
+            return DIMENSION_KEYS.computeIfAbsent(dimension, id -> {
+                var parsed = ResourceLocation.tryParse(id);
+                return parsed == null ? Optional.empty() : Optional.of(ResourceKey.create(Registries.DIMENSION, parsed));
+            }).orElse(null);
+        }
+    }
     private final Map<UUID, SecurityPolicy> policies = new HashMap<>();
     private final Map<UUID, Set<ChunkKey>> footprints = new HashMap<>();
     private final Set<UUID> retired = new HashSet<>();
@@ -49,6 +64,7 @@ public final class SecuritySavedData extends SavedData {
     private record CraftedOutput(UUID terminal, UUID player, AEKey key) {}
     private final Map<CraftedOutput, Long> craftedOutputs = new HashMap<>();
     private long directoryRevision;
+    private long footprintRevision;
 
     public static SecuritySavedData get(MinecraftServer server) {
         return server.overworld().getDataStorage().computeIfAbsent(
@@ -139,14 +155,44 @@ public final class SecuritySavedData extends SavedData {
 
     public void retire(UUID terminal) {
         policies.remove(terminal);
-        footprints.remove(terminal);
+        if (footprints.remove(terminal) != null) footprintRevision++;
         retired.add(terminal);
         craftedOutputs.keySet().removeIf(claim -> claim.terminal().equals(terminal));
         setDirty();
     }
 
-    public void rememberChunks(UUID terminal, Collection<ChunkKey> chunks) {
-        if (footprints.computeIfAbsent(terminal, key -> new HashSet<>()).addAll(chunks)) setDirty();
+    /** A read-only view of the chunks remembered for a terminal, empty when there are none. */
+    public Set<ChunkKey> footprint(UUID terminal) {
+        var chunks = footprints.get(terminal);
+        return chunks == null ? Set.of() : Collections.unmodifiableSet(chunks);
+    }
+
+    /** Changes whenever any remembered footprint changes, so a caller can tell that its last view is current. */
+    public long footprintRevision() { return footprintRevision; }
+
+    /**
+     * Remembers every chunk in current, then forgets each remembered chunk outside current that forgettable
+     * accepts. The predicate is consulted only for chunks outside current, and only when there are any.
+     * Returns whether the remembered set changed; only then is the data marked dirty.
+     */
+    public boolean reconcileChunks(UUID terminal, Set<ChunkKey> current, Predicate<ChunkKey> forgettable) {
+        if (retired.contains(terminal)) return false;
+        var stored = footprints.get(terminal);
+        if (stored == null) {
+            if (current.isEmpty()) return false;
+            stored = new HashSet<>();
+            footprints.put(terminal, stored);
+        }
+        boolean changed = stored.addAll(current);
+        // stored now contains current, so it holds other chunks exactly when it is larger.
+        if (stored.size() > current.size() && stored.removeIf(chunk -> !current.contains(chunk) && forgettable.test(chunk))) {
+            changed = true;
+        }
+        if (changed) {
+            footprintRevision++;
+            setDirty();
+        }
+        return changed;
     }
 
     /** Only prove a split when all formerly connected chunks are available. Never loads a chunk. */
@@ -154,13 +200,34 @@ public final class SecuritySavedData extends SavedData {
         var chunks = footprints.get(terminal);
         if (chunks == null || chunks.isEmpty()) return false;
         for (var chunk : chunks) {
-            var dimension = ResourceLocation.tryParse(chunk.dimension());
-            if (dimension == null) return false;
-            var level = server.getLevel(ResourceKey.create(Registries.DIMENSION, dimension));
-            if (level == null || !level.hasChunk(chunk.x(), chunk.z())
-                    || !level.isPositionEntityTicking(new BlockPos(chunk.x() << 4, 0, chunk.z() << 4))) return false;
+            if (!chunkReady(server, chunk)) return false;
         }
         return true;
+    }
+
+    /** The loaded level a remembered chunk belongs to, or null. */
+    public static ServerLevel level(MinecraftServer server, ChunkKey chunk) {
+        var dimension = chunk.dimensionKey();
+        return dimension == null ? null : server.getLevel(dimension);
+    }
+
+    /** Whether a chunk is loaded and entity-ticking, so that its grid nodes are live. Never loads a chunk. */
+    public static boolean chunkReady(MinecraftServer server, ChunkKey chunk) {
+        var level = level(server, chunk);
+        return level != null && level.hasChunk(chunk.x(), chunk.z())
+                && level.isPositionEntityTicking(new BlockPos(chunk.x() << 4, 0, chunk.z() << 4));
+    }
+
+    /**
+     * Whether a chunk's dimension no longer exists: its id is malformed, or no level is loaded for it and
+     * the world does not list it either. A dimension that is listed but not loaded yet is not gone.
+     */
+    public static boolean dimensionGone(MinecraftServer server, ChunkKey chunk) {
+        var dimension = chunk.dimensionKey();
+        if (dimension == null) return true;
+        if (server.getLevel(dimension) != null) return false;
+        return server.registryAccess().registry(Registries.LEVEL_STEM)
+                .map(stems -> !stems.containsKey(dimension.location())).orElse(true);
     }
 
     public static SecuritySavedData load(CompoundTag tag, HolderLookup.Provider registries) {

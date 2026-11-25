@@ -2,7 +2,7 @@ package dev.ae2security.security;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.GenericStack;
@@ -32,7 +32,7 @@ class SecuritySavedDataTest {
         data.rememberPlayer(owner, "Owner");
         data.rememberPlayer(builder, "Guest");
         data.update(terminal, data.policy(terminal).trust(owner, builder, Permission.BUILD.bit()));
-        data.rememberChunks(terminal, List.of(new SecuritySavedData.ChunkKey("minecraft:overworld", 3, -2)));
+        data.reconcileChunks(terminal, Set.of(new SecuritySavedData.ChunkKey("minecraft:overworld", 3, -2)), chunk -> false);
 
         var serialized = data.save(new CompoundTag(), RegistryAccess.EMPTY);
         var restored = SecuritySavedData.load(serialized, RegistryAccess.EMPTY);
@@ -40,6 +40,7 @@ class SecuritySavedDataTest {
         assertTrue(restored.policy(terminal).allows(builder, Permission.BUILD));
         assertFalse(restored.policy(terminal).allows(builder, Permission.EXTRACT));
         assertEquals(data.players(), restored.players());
+        assertEquals(data.footprint(terminal), restored.footprint(terminal));
         assertTrue(restored.retired(retired));
         assertNull(restored.policy(retired));
         assertEquals(serialized, restored.save(new CompoundTag(), RegistryAccess.EMPTY));
@@ -252,5 +253,77 @@ class SecuritySavedDataTest {
         data.update(terminal, data.policy(terminal).transfer(owner, keeper));
         assertEquals(0, data.craftedAmount(terminal, owner, diamond), "a transfer drops the old owner's claim");
         assertEquals(2, data.craftedAmount(terminal, keeper, diamond), "the new owner keeps their own");
+    }
+
+    private static SecuritySavedData.ChunkKey chunk(int x, int z) {
+        return new SecuritySavedData.ChunkKey("minecraft:overworld", x, z);
+    }
+
+    @Test void reconcileRemembersTheFootprintAndForgetsOnlyAcceptedChunksOutsideIt() {
+        var data = new SecuritySavedData();
+        var terminal = UUID.randomUUID();
+        data.create(terminal, UUID.randomUUID());
+        assertTrue(data.reconcileChunks(terminal, Set.of(chunk(0, 0), chunk(1, 0), chunk(2, 0)), c -> false));
+        assertEquals(Set.of(chunk(0, 0), chunk(1, 0), chunk(2, 0)), data.footprint(terminal));
+
+        var consulted = new java.util.HashSet<SecuritySavedData.ChunkKey>();
+        var current = Set.of(chunk(0, 0), chunk(5, 5));
+        assertTrue(data.reconcileChunks(terminal, current, c -> consulted.add(c) && c.equals(chunk(1, 0))
+                || c.equals(chunk(0, 0))));
+        assertEquals(Set.of(chunk(0, 0), chunk(2, 0), chunk(5, 5)), data.footprint(terminal),
+                "current chunks are added and kept even when accepted; only accepted chunks outside it go");
+        assertEquals(Set.of(chunk(1, 0), chunk(2, 0)), consulted, "only chunks outside the footprint are consulted");
+
+        assertTrue(data.reconcileChunks(terminal, Set.of(chunk(5, 5)), c -> true));
+        assertEquals(Set.of(chunk(5, 5)), data.footprint(terminal), "a provable footprint shrinks to the network");
+    }
+
+    @Test void reconcileWritesOnlyWhenTheRememberedSetChanges() {
+        var data = new SecuritySavedData();
+        var terminal = UUID.randomUUID();
+        data.create(terminal, UUID.randomUUID());
+        data.reconcileChunks(terminal, Set.of(chunk(0, 0), chunk(1, 1)), c -> false);
+        data.setDirty(false);
+        long revision = data.footprintRevision();
+
+        assertFalse(data.reconcileChunks(terminal, Set.of(chunk(0, 0), chunk(1, 1)), c -> {
+            throw new AssertionError("nothing outside the footprint to consult");
+        }));
+        assertFalse(data.reconcileChunks(terminal, Set.of(chunk(0, 0)), c -> false), "an unprovable chunk stays");
+        assertFalse(data.isDirty(), "an unchanged footprint is not written");
+        assertEquals(revision, data.footprintRevision());
+        assertEquals(Set.of(chunk(0, 0), chunk(1, 1)), data.footprint(terminal));
+
+        assertTrue(data.reconcileChunks(terminal, Set.of(chunk(0, 0)), c -> true));
+        assertTrue(data.isDirty());
+        assertNotEquals(revision, data.footprintRevision(), "a change is visible through the revision");
+        assertThrows(UnsupportedOperationException.class, () -> data.footprint(terminal).add(chunk(9, 9)));
+    }
+
+    @Test void retiredTerminalsKeepNoFootprint() {
+        var data = new SecuritySavedData();
+        var terminal = UUID.randomUUID();
+        data.create(terminal, UUID.randomUUID());
+        data.reconcileChunks(terminal, Set.of(chunk(0, 0)), c -> false);
+        long revision = data.footprintRevision();
+        data.retire(terminal);
+        assertTrue(data.footprint(terminal).isEmpty());
+        assertNotEquals(revision, data.footprintRevision(), "retiring changes what callers last saw");
+        assertFalse(data.reconcileChunks(terminal, Set.of(chunk(0, 0)), c -> false));
+        assertTrue(data.footprint(terminal).isEmpty(), "a retired terminal does not start remembering again");
+    }
+
+    @Test void prunedFootprintSurvivesSaveAndLoadInTheSameFormat() {
+        var data = new SecuritySavedData();
+        var terminal = UUID.randomUUID();
+        data.create(terminal, UUID.randomUUID());
+        data.reconcileChunks(terminal, Set.of(chunk(0, 0), chunk(7, -3),
+                new SecuritySavedData.ChunkKey("minecraft:the_nether", 1, 2)), c -> false);
+        data.reconcileChunks(terminal, Set.of(chunk(0, 0)), c -> c.x() == 7);
+        var saved = data.save(new CompoundTag(), RegistryAccess.EMPTY);
+        assertEquals(3, saved.getInt("format"));
+        var restored = SecuritySavedData.load(saved, RegistryAccess.EMPTY);
+        assertEquals(Set.of(chunk(0, 0), new SecuritySavedData.ChunkKey("minecraft:the_nether", 1, 2)),
+                restored.footprint(terminal));
     }
 }

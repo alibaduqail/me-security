@@ -308,10 +308,17 @@ public final class AccessGameTests {
         helper.runAfterDelay(20, () -> {
             trust(level, terminal, owner, viewer, 0);
             trust(level, terminal, owner, builder, Permission.BUILD.bit());
-            for (var name : new String[] {"trash", "magnet", "wireless_crafting_terminal"}) {
-                var type = ResourceLocation.fromNamespaceAndPath("ae2wtlib", name);
-                helper.assertTrue(SecurityAccess.opening(viewer, storageTerminal, type), name + " needs only View");
-                helper.assertFalse(SecurityAccess.opening(outsider, storageTerminal, type), name + " still needs trust");
+            // Menu tags only hold registered types, so the ae2wtlib classification is live only with it installed.
+            if (net.neoforged.fml.ModList.get().isLoaded("ae2wtlib")) {
+                for (var name : new String[] {"trash", "magnet", "wireless_crafting_terminal"}) {
+                    var type = ResourceLocation.fromNamespaceAndPath("ae2wtlib", name);
+                    helper.assertTrue(SecurityAccess.opening(viewer, storageTerminal, type), name + " needs only View");
+                    helper.assertFalse(SecurityAccess.opening(outsider, storageTerminal, type), name + " still needs trust");
+                }
+                for (var name : new String[] {"wireless_pattern_access_terminal", "wireless_pattern_encoding_terminal"}) {
+                    helper.assertFalse(SecurityAccess.opening(builder, storageTerminal,
+                            ResourceLocation.fromNamespaceAndPath("ae2wtlib", name)), name + " stays owner-only");
+                }
             }
             helper.assertFalse(SecurityAccess.opening(viewer, storageTerminal,
                     ResourceLocation.fromNamespaceAndPath("ae2wtlib", "wireless_pattern_access_terminal")),

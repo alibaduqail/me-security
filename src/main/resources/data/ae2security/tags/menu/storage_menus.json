@@ -1,0 +1,15 @@
+{
+  "replace": false,
+  "values": [
+    "ae2:item_terminal",
+    "ae2:craftingterm",
+    "ae2:wirelessterm",
+    "ae2:wirelesscraftingterm",
+    "ae2:basic_cell_chest",
+    "ae2:portable_item_cell",
+    "ae2:portable_fluid_cell",
+    { "id": "ae2wtlib:wireless_crafting_terminal", "required": false },
+    { "id": "ae2wtlib:trash", "required": false },
+    { "id": "ae2wtlib:magnet", "required": false }
+  ]
+}

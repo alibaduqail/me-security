@@ -98,6 +98,8 @@ public final class PlacementGameTests {
         level.setBlockAndUpdate(chest, AEBlocks.ME_CHEST.block().defaultBlockState());
         level.setBlockAndUpdate(iface, AEBlocks.INTERFACE.block().defaultBlockState());
         level.setBlockAndUpdate(publicChest, AEBlocks.ME_CHEST.block().defaultBlockState());
+        // The template has a barrier here; the plane must reach the security check, not fail inside AE2.
+        level.setBlockAndUpdate(chest.north(), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
         helper.runAfterDelay(20, () -> {
             helper.assertTrue(SecurityHardware.protectedBlock(level, chest) && SecurityHardware.protectedBlock(level, iface),
                     "fixture chest and interface must be protected");
@@ -314,7 +316,8 @@ public final class PlacementGameTests {
         var beside = center.east();
         var blocker = PartHelper.setPart(level, beside, Direction.WEST, outsider, AEParts.TERMINAL.get());
         PartHelper.setPart(level, beside, Direction.EAST, outsider, AEParts.TERMINAL.get());
-        cable(level, beside, outsider);
+        // The owner owns a node here, so joining this grid is not a claim of someone else's network.
+        cable(level, beside, owner);
         // A second pair with no Security Terminal anywhere: the freed face meets a public cable.
         var publicCable = center.above(2);
         var publicBeside = publicCable.east();
