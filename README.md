@@ -34,7 +34,7 @@ Only the owner can edit permissions or manage patterns. Transferring ownership o
 | Craft | Calculate, submit, pause, and cancel autocrafting jobs, and collect your own completed final products up to the requested quantity. |
 | Build | Place, remove, recolor, and configure AE2 network hardware, including add-on devices and physical storage cells. |
 
-Changes affect subsequent server actions immediately. Reducing a player's permissions, including removing trust, closes their affected open ME screen. Permission buttons send individual toggle intents so multiple clicks during a slow connection are applied in order to the live server policy.
+Changes affect subsequent server actions immediately. Removing trust, or reducing a permission the open screen depends on (for example Extract for a storage terminal or Build for hardware), closes that player's open ME screen; losing an unrelated permission such as Craft leaves a storage terminal open. Permission buttons send individual toggle intents so multiple clicks during a slow connection are applied in order to the live server policy.
 
 Craft-only collection becomes available after the entire job finishes successfully. Its allowance is tied to the requesting player, the protected network's Security Terminal, and the exact final item or fluid; it is spent as products are withdrawn and survives server restarts. Canceled jobs, intermediate ingredients, byproducts, and other players' jobs grant no collection allowance. The player must still have Craft permission when collecting. Jobs started before installing this feature have no recorded allowance. Manual terminal crafting still requires Extract for network ingredients.
 
