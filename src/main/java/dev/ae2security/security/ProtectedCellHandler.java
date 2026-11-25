@@ -16,7 +16,8 @@ import net.neoforged.neoforge.items.IItemHandler;
 public record ProtectedCellHandler(AEBaseInvBlockEntity host, IItemHandler delegate, IntPredicate cellSlot)
         implements IItemHandler {
     public static IItemHandler wrap(AEBaseInvBlockEntity host, Direction side, IItemHandler handler) {
-        if (handler == null || !SecurityHardware.nativeHost(host)) return handler;
+        // Add-on hosts are wrapped only when they extend one of these AE2 classes and inherit its slot layout.
+        if (handler == null || !SecurityHardware.gridHost(host)) return handler;
         if (host instanceof MEChestBlockEntity chest) {
             // Unsided access combines input slot 0 and cell slot 1. The front exposes only the cell.
             return new ProtectedCellHandler(host, handler, side == null ? slot -> slot == 1
