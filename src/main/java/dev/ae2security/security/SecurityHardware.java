@@ -7,6 +7,8 @@ import java.util.Set;
 import appeng.api.networking.GridHelper;
 import appeng.api.networking.IGrid;
 import appeng.api.networking.IGridNode;
+import appeng.api.networking.IInWorldGridNodeHost;
+import appeng.api.networking.security.IActionHost;
 import appeng.api.parts.IPart;
 import appeng.api.parts.IPartHost;
 import appeng.api.implementations.items.IMemoryCard;
@@ -21,14 +23,13 @@ import appeng.parts.AEBasePart;
 import appeng.util.InteractionUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 
-/** Shared membership resolution for native AE2 hardware, including non-exposed nodes. */
+/** Shared membership resolution for AE2 grid hardware, native or add-on, including non-exposed nodes. */
 public final class SecurityHardware {
     private SecurityHardware() {}
 
@@ -46,9 +47,13 @@ public final class SecurityHardware {
         }
     }
 
-    public static boolean nativeHost(BlockEntity host) {
-        return host != null && BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(host.getType()).getNamespace().equals("ae2")
-                && (host instanceof IGridConnectedBlockEntity || host instanceof CableBusBlockEntity);
+    /**
+     * Any block entity hosting an AE2 grid node is network hardware, whichever mod registered it: full blocks of
+     * AE2 add-ons are protected like native ones. Add-on parts already live in AE2's own cable bus.
+     */
+    public static boolean gridHost(BlockEntity host) {
+        return host instanceof IInWorldGridNodeHost || host instanceof IGridConnectedBlockEntity
+                || host instanceof CableBusBlockEntity;
     }
 
     static Networks networks(BlockEntity host) {
@@ -58,7 +63,7 @@ public final class SecurityHardware {
     }
 
     private static void collect(BlockEntity host, Networks result, Set<BlockEntity> visited) {
-        if (!nativeHost(host) || !visited.add(host)) return;
+        if (!gridHost(host) || !visited.add(host)) return;
         if (host instanceof CableBusBlockEntity cableBus) {
             var center = cableBus.getPart(null);
             if (center != null) collect(center, result);
@@ -72,11 +77,29 @@ public final class SecurityHardware {
                 var node = connected.getGridNode(side);
                 if (node != null) result.add(node);
             }
+        } else if (host instanceof IInWorldGridNodeHost generic) {
+            collect(generic, result);
         }
         if (host instanceof IAEMultiBlock<?> multiblock && multiblock.getCluster() != null) {
             var members = multiblock.getCluster().getBlockEntities();
             while (members.hasNext()) collect(members.next(), result, visited);
         }
+    }
+
+    /**
+     * A host outside AE2's networked block-entity hierarchy reports its nodes per side. A host that reports no
+     * node at all has not joined a grid yet and is unresolved, like a native host whose main node is missing.
+     */
+    private static void collect(IInWorldGridNodeHost host, Networks result) {
+        boolean found = host instanceof IActionHost actionHost && addPresent(actionHost.getActionableNode(), result);
+        for (var side : Direction.values()) found |= addPresent(host.getGridNode(side), result);
+        if (!found) result.unresolved = true;
+    }
+
+    private static boolean addPresent(IGridNode node, Networks result) {
+        if (node == null) return false;
+        result.add(node);
+        return true;
     }
 
     static void collect(IPart part, Networks result) {
