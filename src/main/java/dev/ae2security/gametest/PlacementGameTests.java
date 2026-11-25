@@ -314,7 +314,8 @@ public final class PlacementGameTests {
         var beside = center.east();
         var blocker = PartHelper.setPart(level, beside, Direction.WEST, outsider, AEParts.TERMINAL.get());
         PartHelper.setPart(level, beside, Direction.EAST, outsider, AEParts.TERMINAL.get());
-        cable(level, beside, outsider);
+        // The owner owns a node here, so joining this grid is not a claim of someone else's network.
+        cable(level, beside, owner);
         // A second pair with no Security Terminal anywhere: the freed face meets a public cable.
         var publicCable = center.above(2);
         var publicBeside = publicCable.east();
