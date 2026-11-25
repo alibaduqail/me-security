@@ -1,6 +1,7 @@
 package dev.ae2security.security;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import appeng.api.networking.*;
 import appeng.api.networking.security.*;
 import appeng.api.config.Actionable;
@@ -17,6 +18,7 @@ import appeng.menu.me.crafting.*;
 import appeng.menu.me.items.PatternEncodingTermMenu;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -24,8 +26,36 @@ import net.minecraft.world.entity.player.Player;
 
 /** The common server authorization entry point for menus, storage, crafting and shortcuts. */
 public final class SecurityAccess {
-    private static final Map<Player, Long> LAST_NOTICE = Collections.synchronizedMap(new WeakHashMap<>());
+    /** Per-player, per-message tick of the last notice shown; each player's inner map is bounded. */
+    private static final Map<Player, Map<String, Long>> LAST_NOTICE = Collections.synchronizedMap(new WeakHashMap<>());
+    private static final int MAX_NOTICE_KEYS = 32;
+    private static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
+    static final int BYPASS_PERMISSION_LEVEL = 2;
+    /** Operators who switched on /mesecurity bypass. In memory only: cleared on logout and server stop. */
+    private static final Set<UUID> ADMIN_BYPASS = ConcurrentHashMap.newKeySet();
     private SecurityAccess() {}
+
+    /** The single place that decides whether a player is exempt from every ME Security check. */
+    public static boolean bypassing(Player player) {
+        if (ADMIN_BYPASS.isEmpty() || !ADMIN_BYPASS.contains(player.getUUID())) return false;
+        // An operator who was de-opped while the bypass was on must not keep it.
+        if (player instanceof ServerPlayer serverPlayer && serverPlayer.hasPermissions(BYPASS_PERMISSION_LEVEL)) return true;
+        if (ADMIN_BYPASS.remove(player.getUUID())) {
+            LOGGER.info("ME Security admin bypass ended for {} ({}): no longer permission level {}",
+                    player.getGameProfile().getName(), player.getUUID(), BYPASS_PERMISSION_LEVEL);
+        }
+        return false;
+    }
+
+    /** Flips the player's bypass and returns whether it is now on. */
+    static boolean toggleBypass(UUID player) {
+        if (ADMIN_BYPASS.remove(player)) return false;
+        ADMIN_BYPASS.add(player);
+        return true;
+    }
+
+    static void clearBypass(UUID player) { ADMIN_BYPASS.remove(player); }
+    static void clearBypass() { ADMIN_BYPASS.clear(); }
 
     public static IGrid grid(Object host) {
         IGridNode node = null;
@@ -56,7 +86,7 @@ public final class SecurityAccess {
     }
 
     public static AccessDecision check(IGrid grid, Player player, Permission permission, boolean ownerOnly) {
-        if (grid == null || player.level().isClientSide()) return AccessDecision.ALLOW;
+        if (grid == null || player.level().isClientSide() || bypassing(player)) return AccessDecision.ALLOW;
         return grid.getService(ISecurityGrid.class).check(player.getUUID(), permission, ownerOnly);
     }
 
@@ -255,10 +285,19 @@ public final class SecurityAccess {
     public static void notice(Player player, Component message) {
         if (!(player instanceof ServerPlayer serverPlayer)) return;
         long tick = serverPlayer.server.getTickCount();
-        Long previous = LAST_NOTICE.get(player);
-        if (previous == null || tick - previous >= 20 || tick < previous) {
-            player.displayClientMessage(message, true);
-            LAST_NOTICE.put(player, tick);
+        String key = message.getContents() instanceof TranslatableContents translatable
+                ? translatable.getKey()
+                : message.getString();
+        boolean show;
+        synchronized (LAST_NOTICE) {
+            Map<String, Long> perMessage = LAST_NOTICE.computeIfAbsent(player, p -> new HashMap<>());
+            Long previous = perMessage.get(key);
+            show = previous == null || tick - previous >= 20 || tick < previous;
+            if (show) {
+                if (perMessage.size() >= MAX_NOTICE_KEYS && !perMessage.containsKey(key)) perMessage.clear();
+                perMessage.put(key, tick);
+            }
         }
+        if (show) player.displayClientMessage(message, true);
     }
 }
