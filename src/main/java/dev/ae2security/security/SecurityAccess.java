@@ -35,12 +35,21 @@ public final class SecurityAccess {
     /** AE2 Wireless Terminals menus that only need View; trash and magnet hold the player's own item data. */
     private static final Set<String> WIRELESS_VIEW_MENUS = Set.of("wireless_crafting_terminal", "trash", "magnet");
     /** Operators who switched on /mesecurity bypass. In memory only: cleared on logout and server stop. */
+    private static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
+    static final int BYPASS_PERMISSION_LEVEL = 2;
     private static final Set<UUID> ADMIN_BYPASS = ConcurrentHashMap.newKeySet();
     private SecurityAccess() {}
 
     /** The single place that decides whether a player is exempt from every ME Security check. */
     public static boolean bypassing(Player player) {
-        return !ADMIN_BYPASS.isEmpty() && ADMIN_BYPASS.contains(player.getUUID());
+        if (ADMIN_BYPASS.isEmpty() || !ADMIN_BYPASS.contains(player.getUUID())) return false;
+        // An operator who was de-opped while the bypass was on must not keep it.
+        if (player instanceof ServerPlayer serverPlayer && serverPlayer.hasPermissions(BYPASS_PERMISSION_LEVEL)) return true;
+        if (ADMIN_BYPASS.remove(player.getUUID())) {
+            LOGGER.info("ME Security admin bypass ended for {} ({}): no longer permission level {}",
+                    player.getGameProfile().getName(), player.getUUID(), BYPASS_PERMISSION_LEVEL);
+        }
+        return false;
     }
 
     /** Flips the player's bypass and returns whether it is now on. */

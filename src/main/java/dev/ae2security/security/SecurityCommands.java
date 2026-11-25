@@ -33,7 +33,7 @@ import org.slf4j.Logger;
  */
 public final class SecurityCommands {
     private static final Logger LOGGER = LogUtils.getLogger();
-    private static final int PERMISSION_LEVEL = 2;
+    private static final int PERMISSION_LEVEL = SecurityAccess.BYPASS_PERMISSION_LEVEL;
     private static final int MAX_SUGGESTIONS = 100;
 
     private SecurityCommands() {}

@@ -23,6 +23,8 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.players.PlayerList;
+import net.minecraft.server.players.ServerOpListEntry;
 import net.neoforged.neoforge.common.util.FakePlayerFactory;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -118,11 +120,14 @@ public final class AdminCommandGameTests {
         helper.runAfterDelay(5, () -> {
             var grid = terminal.getGridNode().getGrid();
             var host = level.getBlockEntity(position);
+            var players = level.getServer().getPlayerList();
+            var profile = operator.getGameProfile();
             try {
                 helper.assertValueEqual(AccessDecision.DENIED,
                         SecurityAccess.check(grid, operator, Permission.BUILD, false), "precondition: not trusted");
                 helper.assertFalse(SecurityBreak.allowBlockBreak(host, operator), "precondition: owner-only removal");
 
+                op(players, profile);
                 helper.assertValueEqual(1, run(level, admin(level).withEntity(operator), "mesecurity bypass"),
                         "bypass toggles on");
                 helper.assertTrue(SecurityAccess.bypassing(operator), "the operator is bypassing");
@@ -143,7 +148,21 @@ public final class AdminCommandGameTests {
                 helper.assertFalse(SecurityBreak.allowBlockBreak(host, operator), "owner-only removal applies again");
                 helper.assertValueEqual(0, run(level, admin(level), "mesecurity bypass"),
                         "bypass needs a player as its source");
+
+                // De-opping ends a bypass that is still switched on.
+                helper.assertValueEqual(1, run(level, admin(level).withEntity(operator), "mesecurity bypass"),
+                        "bypass toggles on again");
+                helper.assertTrue(SecurityAccess.bypassing(operator), "the opped operator bypasses again");
+                players.deop(profile);
+                helper.assertValueEqual(AccessDecision.DENIED,
+                        SecurityAccess.check(grid, operator, Permission.BUILD, false),
+                        "a de-opped player no longer bypasses");
+                helper.assertFalse(SecurityAccess.bypassing(operator), "the bypass is gone");
+                op(players, profile);
+                helper.assertFalse(SecurityAccess.bypassing(operator),
+                        "re-opping does not revive a bypass that ended; it must be switched on again");
             } finally {
+                players.deop(profile);
                 if (SecurityAccess.bypassing(operator)) run(level, admin(level).withEntity(operator), "mesecurity bypass");
             }
             cleanUp(level, position, terminal);
@@ -171,6 +190,11 @@ public final class AdminCommandGameTests {
             cleanUp(level, position, (SecurityTerminalPart) terminal);
             helper.succeed();
         });
+    }
+
+    /** The GameTest server's default operator level is 0, so the entry carries an explicit level. */
+    private static void op(PlayerList players, GameProfile profile) {
+        players.getOps().add(new ServerOpListEntry(profile, 4, false));
     }
 
     private static int run(ServerLevel level, CommandSourceStack source, String command) {
