@@ -52,7 +52,7 @@ subsequent actions use the new permissions immediately.
 | Insert | Deposit items and fluids, including shift-clicking and fluid containers. |
 | Extract | Withdraw items and fluids, and take network ingredients for manual crafting. |
 | Craft | Request autocrafting, pause or cancel jobs, and collect your own completed final products up to the requested quantity. |
-| Build | Place, remove, recolor, and configure native AE2 network hardware, including physical storage cells. |
+| Build | Place, remove, recolor, and configure AE2 network hardware, including add-on devices and physical storage cells. |
 
 Trust always includes viewing access. Build does not grant terminal Insert, Extract, or Craft,
 but it grants full hardware trust: a builder can remove storage cells and access their contents.
@@ -118,7 +118,9 @@ to the player who next places it.
 
 Ordinary drives, controllers, crafting CPUs, quantum bridges, spatial devices, cables,
 and cable parts on the network require Build permission for mining, wrench removal,
-rotation, configuration, and upgrades. Device menus recheck permissions on every action
+rotation, configuration, and upgrades. Blocks from AE2 add-ons that connect to the
+network are protected the same way, and their screens need Build unless the pack
+classifies them otherwise. Device menus recheck permissions on every action
 and close when their host is replaced or the player moves out of reach.
 
 Protected network hardware and the Security Terminal's whole cable-bus block survive
@@ -127,6 +129,7 @@ it does not depend on power or channels.
 
 ## Protection limits
 
-Coverage applies to native AE2 network hardware. Arbitrary third-party tools or movers,
+Coverage applies to AE2 network hardware, including add-on blocks that host AE2 grid
+nodes. Arbitrary third-party tools or movers,
 administrative commands, external inventories, and machine outputs remain outside
 its protection scope.
