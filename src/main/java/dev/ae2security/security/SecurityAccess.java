@@ -1,6 +1,7 @@
 package dev.ae2security.security;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import appeng.api.networking.*;
 import appeng.api.networking.security.*;
 import appeng.api.config.Actionable;
@@ -36,7 +37,33 @@ public final class SecurityAccess {
             "spatialioport", "wireless_access_point", "vibrationchamber", "inscriber", "condenser");
     /** AE2 Wireless Terminals menus that only need View; trash and magnet hold the player's own item data. */
     private static final Set<String> WIRELESS_VIEW_MENUS = Set.of("wireless_crafting_terminal", "trash", "magnet");
+    /** Operators who switched on /mesecurity bypass. In memory only: cleared on logout and server stop. */
+    private static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
+    static final int BYPASS_PERMISSION_LEVEL = 2;
+    private static final Set<UUID> ADMIN_BYPASS = ConcurrentHashMap.newKeySet();
     private SecurityAccess() {}
+
+    /** The single place that decides whether a player is exempt from every ME Security check. */
+    public static boolean bypassing(Player player) {
+        if (ADMIN_BYPASS.isEmpty() || !ADMIN_BYPASS.contains(player.getUUID())) return false;
+        // An operator who was de-opped while the bypass was on must not keep it.
+        if (player instanceof ServerPlayer serverPlayer && serverPlayer.hasPermissions(BYPASS_PERMISSION_LEVEL)) return true;
+        if (ADMIN_BYPASS.remove(player.getUUID())) {
+            LOGGER.info("ME Security admin bypass ended for {} ({}): no longer permission level {}",
+                    player.getGameProfile().getName(), player.getUUID(), BYPASS_PERMISSION_LEVEL);
+        }
+        return false;
+    }
+
+    /** Flips the player's bypass and returns whether it is now on. */
+    static boolean toggleBypass(UUID player) {
+        if (ADMIN_BYPASS.remove(player)) return false;
+        ADMIN_BYPASS.add(player);
+        return true;
+    }
+
+    static void clearBypass(UUID player) { ADMIN_BYPASS.remove(player); }
+    static void clearBypass() { ADMIN_BYPASS.clear(); }
 
     public static IGrid grid(Object host) {
         IGridNode node = null;
@@ -67,7 +94,7 @@ public final class SecurityAccess {
     }
 
     public static AccessDecision check(IGrid grid, Player player, Permission permission, boolean ownerOnly) {
-        if (grid == null || player.level().isClientSide()) return AccessDecision.ALLOW;
+        if (grid == null || player.level().isClientSide() || bypassing(player)) return AccessDecision.ALLOW;
         return grid.getService(ISecurityGrid.class).check(player.getUUID(), permission, ownerOnly);
     }
 
