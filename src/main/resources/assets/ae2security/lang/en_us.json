@@ -39,6 +39,7 @@
   "screen.ae2security.confirm_transfer": "Confirm transfer",
   "screen.ae2security.transfer_name": "Player name",
   "screen.ae2security.transfer_prompt": "Type %s to confirm",
+  "screen.ae2security.transfer_prompt_short": "Type %s",
   "screen.ae2security.transfer_warning": "Type the selected player's name to transfer ownership. You will lose access. Existing trusted players remain.",
   "screen.ae2security.loading": "Loading policy...",
   "screen.ae2security.no_players": "No matching players",

@@ -1,6 +1,7 @@
 package dev.ae2security.client;
 
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -48,6 +49,7 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
     private static final int TRUST_BUTTON_Y = 160;
     private static final int TRUST_BUTTON_Y_UNTRUSTED = 116;
     private static final int TRANSFER_TEXT_Y = 180;
+    private static final int PANEL_TEXT_WIDTH = 128;
     private static final int TRANSFER_NAME_Y = 190;
     private static final int TRANSFER_BUTTON_Y = 204;
     private static final int PLAYER_ROW_TOP = 74;
@@ -408,8 +410,10 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         var selectedPlayer = players.selection();
         String accessHeading = selectedPlayer == null
                 ? Component.translatable("screen.ae2security.select").getString()
-                : Component.translatable("screen.ae2security.access_for", selectedPlayer.name()).getString();
-        graphics.drawString(font, font.plainSubstrByWidth(accessHeading, 128), 164, 43,
+                : SecurityScreenText.firstThatFits(List.of(
+                        Component.translatable("screen.ae2security.access_for", selectedPlayer.name()).getString(),
+                        selectedPlayer.name()), PANEL_TEXT_WIDTH, font::width);
+        graphics.drawString(font, font.plainSubstrByWidth(accessHeading, PANEL_TEXT_WIDTH), 164, 43,
                 selectedPlayer == null ? AE2_MUTED_TEXT : AE2_DARK, false);
 
         if (selectedPlayer != null && selectedPlayer.trusted()) {
@@ -425,15 +429,19 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
 
         // The prompt and the edit status share one line; the status wins while an edit is pending.
         if (selectedPlayer != null && selectedPlayer.id().equals(transferConfirmation) && !edits.pending()) {
-            var prompt = Component.translatable("screen.ae2security.transfer_prompt", selectedPlayer.name());
-            graphics.drawString(font, font.plainSubstrByWidth(prompt.getString(), 128), 164, TRANSFER_TEXT_Y,
+            var name = selectedPlayer.name();
+            var prompt = SecurityScreenText.firstThatFits(List.of(
+                    Component.translatable("screen.ae2security.transfer_prompt", name).getString(),
+                    Component.translatable("screen.ae2security.transfer_prompt_short", name).getString(),
+                    name), PANEL_TEXT_WIDTH, font::width);
+            graphics.drawString(font, font.plainSubstrByWidth(prompt, PANEL_TEXT_WIDTH), 164, TRANSFER_TEXT_Y,
                     AE2_MUTED_TEXT, false);
         }
 
         String pages = (players.page() + 1) + " / " + (players.lastPage() + 1);
-        graphics.drawCenteredString(font, pages, 82, PAGER_Y + 5, AE2_DARK);
+        drawCenteredFlat(graphics, Component.literal(pages), 82, PAGER_Y + 5, AE2_DARK);
         if (players.players().isEmpty()) {
-            graphics.drawCenteredString(font, Component.translatable(players.searching()
+            drawCenteredFlat(graphics, Component.translatable(players.searching()
                     ? "screen.ae2security.searching" : "screen.ae2security.no_players"), 82, 98,
                     AE2_MUTED_TEXT);
         }
@@ -446,6 +454,11 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
                     164, TRANSFER_TEXT_Y, editStatus == PolicyEditResult.Result.APPLIED ? AE2_DARK : STATUS_WARNING, false);
         }
 
+    }
+
+    /** Centered like drawCenteredString, but without its drop shadow, matching the screen's other labels. */
+    private void drawCenteredFlat(GuiGraphics graphics, Component text, int centerX, int y, int color) {
+        graphics.drawString(font, text, centerX - font.width(text) / 2, y, color, false);
     }
 
     @Override
