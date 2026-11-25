@@ -25,14 +25,6 @@ import net.minecraft.world.entity.player.Player;
 /** The common server authorization entry point for menus, storage, crafting and shortcuts. */
 public final class SecurityAccess {
     private static final Map<Player, Long> LAST_NOTICE = Collections.synchronizedMap(new WeakHashMap<>());
-    private static final Set<String> STORAGE_MENUS = Set.of("item_terminal", "craftingterm", "wirelessterm",
-            "wirelesscraftingterm", "basic_cell_chest", "portable_item_cell", "portable_fluid_cell");
-    private static final Set<String> HARDWARE_MENUS = Set.of("drive", "me_chest", "ioport", "priority",
-            "storagebus", "import_bus", "export_bus", "formationplane", "interface", "set_stock_amount",
-            "molecular_assembler", "energy_level_emitter", "storage_level_emitter", "qnb", "spatialanchor",
-            "spatialioport", "wireless_access_point", "vibrationchamber", "inscriber", "condenser");
-    /** AE2 Wireless Terminals menus that only need View; trash and magnet hold the player's own item data. */
-    private static final Set<String> WIRELESS_VIEW_MENUS = Set.of("wireless_crafting_terminal", "trash", "magnet");
     private SecurityAccess() {}
 
     public static IGrid grid(Object host) {
@@ -101,7 +93,7 @@ public final class SecurityAccess {
     }
 
     /**
-     * Mount-time rule for a storage bus: native AE2 hardware of another protected network (an Interface's
+     * Mount-time rule for a storage bus: AE2 grid hardware (native or add-on) of another protected network (an Interface's
      * whole-network storage, an ME Chest's cell) is only mounted when the bus's placer has Build there.
      * UNRESOLVED means the faced hardware has no grid yet and the caller should look again later.
      * A mount that was legitimate stays mounted until the bus re-evaluates its target; {@link #transfer}
@@ -112,7 +104,7 @@ public final class SecurityAccess {
         if (level == null || level.isClientSide()) return AccessDecision.ALLOW;
         var side = bus.getSide();
         var target = side == null ? null : level.getBlockEntity(bus.getBlockEntity().getBlockPos().relative(side));
-        if (!SecurityHardware.nativeHost(target)) return AccessDecision.ALLOW;
+        if (!SecurityHardware.gridHost(target)) return AccessDecision.ALLOW;
         var faced = target instanceof IPartHost parts ? parts.getPart(side.getOpposite()) : null;
         Collection<IGrid> grids;
         if (faced != null) {
@@ -181,13 +173,9 @@ public final class SecurityAccess {
     public static boolean opening(Player player, Object host, ResourceLocation type) {
         if (player.level().isClientSide()) return true;
         if (!liveHost(player, host)) return false;
-        String name = type.getPath();
-        boolean ae2 = type.getNamespace().equals("ae2");
-        boolean storage = ae2 && STORAGE_MENUS.contains(name)
-                || type.getNamespace().equals("ae2wtlib") && WIRELESS_VIEW_MENUS.contains(name);
-        boolean craftingRequest = ae2 && Set.of("craftamount", "craftconfirm").contains(name);
-        boolean status = ae2 && Set.of("craftingcpu", "craftingstatus").contains(name);
-        if (ae2 && HARDWARE_MENUS.contains(name)) {
+        var access = MenuAccess.of(type);
+        // Hardware menus, including unclassified add-on machine screens, need Build on the hardware itself.
+        if (access.needsBuild()) {
             if (host instanceof net.minecraft.world.level.block.entity.BlockEntity blockEntity) {
                 return SecurityHardware.allowBuild(blockEntity, player);
             }
@@ -196,14 +184,15 @@ public final class SecurityAccess {
             }
             return allow(grid(host), player, Permission.BUILD, false);
         }
-        // An uninitialized native host is unresolved, never a public network.
+        // An uninitialized grid host is unresolved, never a public network.
         if (host instanceof net.minecraft.world.level.block.entity.BlockEntity blockEntity
-                && SecurityHardware.nativeHost(blockEntity) && SecurityHardware.networks(blockEntity).unresolved) {
+                && SecurityHardware.gridHost(blockEntity) && SecurityHardware.networks(blockEntity).unresolved) {
             notice(player, AccessDecision.UNRESOLVED);
             return false;
         }
+        boolean craftingRequest = access == MenuAccess.CRAFTING_REQUEST;
         return allow(grid(host), player, craftingRequest ? Permission.CRAFT : Permission.VIEW,
-                !storage && !craftingRequest && !status);
+                access == MenuAccess.OWNER);
     }
 
     private static boolean liveHost(Player player, Object host) {

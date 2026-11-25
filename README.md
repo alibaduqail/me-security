@@ -32,7 +32,7 @@ Only the owner can edit permissions or manage patterns. Transferring ownership o
 | Insert | Deposit items and fluids through terminals, container interactions, and supported wireless shortcuts. |
 | Extract | Withdraw items and fluids, including network ingredients used by manual terminal crafting. |
 | Craft | Calculate, submit, pause, and cancel autocrafting jobs, and collect your own completed final products up to the requested quantity. |
-| Build | Place, remove, recolor, and configure native AE2 network hardware, including physical storage cells. |
+| Build | Place, remove, recolor, and configure AE2 network hardware, including add-on devices and physical storage cells. |
 
 Changes affect subsequent server actions immediately. Reducing a player's permissions, including removing trust, closes their affected open ME screen. Permission buttons send individual toggle intents so multiple clicks during a slow connection are applied in order to the live server policy.
 
@@ -48,7 +48,9 @@ Only its owner can dismantle a Security Terminal or break the cable-bus block co
 
 ### Hardware protection
 
-The same terminal protects ordinary AE2 drives, controllers, crafting CPUs, quantum bridges, spatial devices, cables, and cable parts. Build permission grants full hardware trust: it allows mining, wrench removal, configuration, and manual storage-cell management, including access to the contents of removable cells. Security and pattern-management screens remain owner-only.
+The same terminal protects ordinary AE2 drives, controllers, crafting CPUs, quantum bridges, spatial devices, cables, and cable parts. Hardware from AE2 add-ons is protected the same way when its block hosts an AE2 grid node, whichever mod registered it; add-on cable parts already live in AE2's cable bus. A device whose grid node is not available yet counts as unresolved and stays protected. Build permission grants full hardware trust: it allows mining, wrench removal, configuration, and manual storage-cell management, including access to the contents of removable cells. Security and pattern-management screens remain owner-only.
+
+Menu access is classified with three menu-type tags: `ae2security:owner_menus` (owner only), `ae2security:hardware_menus` (Build), and `ae2security:storage_menus` (View; storage transactions are still checked separately). Owner beats hardware, which beats storage. AE2's crafting amount and confirmation screens need Craft, and its crafting CPU and status screens need View. Any other AE2-based menu, such as an add-on machine screen, needs Build. Pack makers can extend or override the classification with a datapack at `data/ae2security/tags/menu/owner_menus.json`, `hardware_menus.json`, or `storage_menus.json`.
 
 Build also covers P2P attunement, facade installation, monitor settings, and physical view cells in shared terminals. Conversion-monitor deposits and withdrawals use Insert and Extract permissions independently of Build.
 
@@ -60,6 +62,6 @@ The unreleased Secure Drive and PIN system have been removed outright. This cand
 
 ME Security controls player access through supported AE2 and AE2 Wireless Terminals menus, network storage transactions, crafting requests, crafting controls, and wireless restock inventory synchronization. Machine automation has no player principal and continues normally. Jobs already accepted by a crafting CPU continue after the initiating player's access changes.
 
-Hardware protection applies to native AE2 network devices and follows actual network connections, including conservative protection during unresolved topology. It does not protect arbitrary third-party movers or tools, administrative commands, external inventories, or machine outputs. The mod does not provide land claims, access history, or lockdown controls.
+Hardware protection applies to native AE2 network devices and to add-on blocks that host AE2 grid nodes, and follows actual network connections, including conservative protection during unresolved topology. Add-on menus that the tags above do not classify require Build; add-on pattern-management screens become owner-only only when a pack adds them to `owner_menus`. Hopper and bus protection for storage-cell slots covers add-on devices only when they extend AE2's drive, ME Chest, IO Port, Spatial IO Port, or quantum bridge. It does not protect arbitrary third-party movers or tools, administrative commands, external inventories, or machine outputs. The mod does not provide land claims, access history, or lockdown controls.
 
 Compatibility is limited to the exact versions in the table. Adding another terminal mod or changing an existing menu or packet path requires an explicit integration review; unknown integrations are not claimed to be protected.
