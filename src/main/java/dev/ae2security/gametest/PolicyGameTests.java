@@ -94,7 +94,8 @@ public final class PolicyGameTests {
     public static void obstructedPlacementLeavesNoGhostPolicy(GameTestHelper helper) {
         var level = helper.getLevel();
         var position = helper.absolutePos(TERMINAL_POS);
-        var owner = player(level, "GhostOwner", position);
+        // Item use of a Security Terminal needs a real player: fake players are refused.
+        var owner = helper.makeMockServerPlayerInLevel();
         var outsider = player(level, "GhostOutsider", position);
         placeCable(level, position, owner);
         helper.runAfterDelay(20, () -> {
