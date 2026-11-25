@@ -551,8 +551,11 @@ public final class HardwareGameTests {
                 var hit = new BlockHitResult(Vec3.atCenterOf(center).add(0, .49, 0), Direction.UP, center, false);
                 ((appeng.blockentity.networking.CableBusBlockEntity) level.getBlockEntity(center)).disassembleWithWrench(owner, level, hit, ItemStack.EMPTY);
                 helper.assertTrue(SecuritySavedData.get(level.getServer()).retired(terminal.terminalId()), "owner removal retires the policy");
-                helper.assertFalse(cachedDrive.extractItem(0, 1, false).isEmpty(), "the same cached handler becomes public after terminal removal");
-                helper.succeed();
+                // The handler caches its protection answer for one tick, so the change shows from the next tick.
+                helper.runAfterDelay(2, () -> {
+                    helper.assertFalse(cachedDrive.extractItem(0, 1, false).isEmpty(), "the same cached handler becomes public after terminal removal");
+                    helper.succeed();
+                });
             });
         });
     }

@@ -53,7 +53,7 @@ subsequent actions use the new permissions immediately.
 | Extract | Withdraw items and fluids, and take network ingredients for manual crafting. |
 | Craft | Request autocrafting and pause or cancel jobs. Does not allow withdrawing the results. |
 | Collect | Withdraw your own completed final products up to the requested quantity, without Extract. With reversible patterns this can turn network stock into withdrawable items. |
-| Build | Place, remove, recolor, and configure native AE2 network hardware, including physical storage cells. |
+| Build | Place, remove, recolor, and configure AE2 network hardware, including add-on devices and physical storage cells. |
 
 Trust always includes viewing access. Build does not grant terminal Insert, Extract, Craft, or Collect,
 but it grants full hardware trust: a builder can remove storage cells and access their contents.
@@ -107,7 +107,8 @@ continue even if their initiating player later loses permission.
 Power loss or running out of channels does not disable protection. Policies survive
 chunk unloading and server restarts. After a cable split, a detached network becomes
 public once disconnection can be verified. If needed chunks are unloaded, protection
-is retained until the topology can be checked.
+is retained until the topology can be checked. Chunks the network no longer reaches
+stop counting once they have been checked while loaded together with the terminal.
 
 Normal placement and recoloring cannot merge two Security Terminals into one network.
 If another connection path creates a conflict, player access is denied until an extra
@@ -116,11 +117,18 @@ terminal is removed. Each owner can still open their own terminal's management s
 Removing the Security Terminal ends its policy. Its dropped item is fresh and binds
 to the player who next places it.
 
+Operators can recover a network whose owner is gone with `/mesecurity`: `info` shows a
+terminal's owner and trusted players, `setowner` hands it to another player, `retire`
+ends its policy, and `bypass` toggles a personal admin bypass. A terminal placed with no
+owning player protects nothing.
+
 ## Hardware and explosion protection
 
 Ordinary drives, controllers, crafting CPUs, quantum bridges, spatial devices, cables,
 and cable parts on the network require Build permission for mining, wrench removal,
-rotation, configuration, and upgrades. Device menus recheck permissions on every action
+rotation, configuration, and upgrades. Blocks from AE2 add-ons that connect to the
+network are protected the same way, and their screens need Build unless the pack
+classifies them otherwise. Device menus recheck permissions on every action
 and close when their host is replaced or the player moves out of reach.
 
 Protected network hardware and the Security Terminal's whole cable-bus block survive
@@ -129,6 +137,6 @@ it does not depend on power or channels.
 
 ## Protection limits
 
-Coverage applies to native AE2 network hardware. Arbitrary third-party tools or movers,
-administrative commands, external inventories, and machine outputs remain outside
-its protection scope.
+Coverage applies to AE2 network hardware, including add-on blocks that host AE2 grid
+nodes. Arbitrary third-party tools or movers, world-editing commands such as `/setblock`,
+external inventories, and machine outputs remain outside its protection scope.
