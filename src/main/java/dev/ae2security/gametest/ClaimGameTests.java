@@ -1,11 +1,8 @@
 package dev.ae2security.gametest;
 
-import java.util.UUID;
-
 import appeng.api.parts.PartHelper;
 import appeng.api.util.AEColor;
 import appeng.core.definitions.AEParts;
-import com.mojang.authlib.GameProfile;
 import dev.ae2security.MESecurity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -19,7 +16,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.common.util.FakePlayerFactory;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
@@ -31,9 +27,15 @@ public final class ClaimGameTests {
 
     private ClaimGameTests() {}
 
-    private static ServerPlayer player(ServerLevel level, String name, BlockPos pos) {
-        var player = FakePlayerFactory.get(level, new GameProfile(UUID.randomUUID(), name));
-        player.setPos(Vec3.atCenterOf(pos));
+    /**
+     * A real (non-fake) ServerPlayer with a fresh profile and a mock connection, beside the fixture so it never
+     * blocks placement. It is removed from the player list straight away: a connected player left in the world
+     * would receive AE2 effect packets from concurrently running tests and fail them.
+     */
+    private static ServerPlayer player(GameTestHelper helper, BlockPos pos) {
+        var player = helper.makeMockServerPlayerInLevel();
+        helper.getLevel().getServer().getPlayerList().remove(player);
+        player.setPos(Vec3.atCenterOf(pos.offset(0, 0, 3)));
         return player;
     }
 
@@ -66,8 +68,8 @@ public final class ClaimGameTests {
     public static void strangerCannotSecureSomeoneElsesNetwork(GameTestHelper helper) {
         var level = helper.getLevel();
         var center = helper.absolutePos(CENTER);
-        var builder = player(level, "ClaimBuilder", center);
-        var stranger = player(level, "ClaimStranger", center);
+        var builder = player(helper, center);
+        var stranger = player(helper, center);
         cable(level, center, builder);
         cable(level, center.east(), builder);
         helper.runAfterDelay(20, () -> {
@@ -86,7 +88,7 @@ public final class ClaimGameTests {
     public static void ownerlessNetworkCanBeSecuredByAnyone(GameTestHelper helper) {
         var level = helper.getLevel();
         var center = helper.absolutePos(CENTER);
-        var anyone = player(level, "ClaimAnyone", center);
+        var anyone = player(helper, center);
         cable(level, center, null);
         cable(level, center.east(), null);
         helper.runAfterDelay(20, () -> {
@@ -100,8 +102,8 @@ public final class ClaimGameTests {
     public static void coBuilderCanSecureSharedNetwork(GameTestHelper helper) {
         var level = helper.getLevel();
         var center = helper.absolutePos(CENTER);
-        var first = player(level, "ClaimFirst", center);
-        var second = player(level, "ClaimSecond", center);
+        var first = player(helper, center);
+        var second = player(helper, center);
         cable(level, center, first);
         cable(level, center.east(), second);
         helper.runAfterDelay(20, () -> {
@@ -115,8 +117,8 @@ public final class ClaimGameTests {
     public static void cableCannotBridgeOwnTerminalIntoForeignNetwork(GameTestHelper helper) {
         var level = helper.getLevel();
         var center = helper.absolutePos(CENTER);
-        var mine = player(level, "BridgeMine", center);
-        var theirs = player(level, "BridgeTheirs", center);
+        var mine = player(helper, center);
+        var theirs = player(helper, center);
         cable(level, center, mine);
         PartHelper.setPart(level, center, Direction.UP, mine, MESecurity.TERMINAL_ITEM.get());
         cable(level, center.east(2), theirs);
