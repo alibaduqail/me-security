@@ -47,7 +47,7 @@ Only one Security Terminal may be attached to a connected grid. Normal player pl
 
 Wireless terminals still require normal AE2 access-point pairing and range or quantum-link conditions. A paired item does not grant ME Security permissions.
 
-Only its owner can dismantle a Security Terminal or break the cable-bus block containing it, regardless of Build permission (operators can use the recovery commands under Administration). Removing it retires its policy and drops a fresh, unbound part item. Policy identities and conservative topology associations survive chunk unloads and server restarts without chunk loading. Power loss and channel exhaustion do not turn protection off.
+Only its owner can dismantle a Security Terminal or break the cable-bus block containing it, regardless of Build permission (operators can use the recovery commands under Administration). Removing it retires its policy and drops a fresh, unbound part item. A terminal copied with its block data (structure templates, `/clone`, creative pick-block, or world editors) receives its own identity with the original's owner and trusted players once the original is found still in place, and removing such a copy never retires the original's policy; Spatial IO and other movers that vacate the old location keep the identity. A copy that is never loaded together with its original cannot be told apart from a move and keeps sharing the policy until both are loaded. Policy identities and conservative topology associations survive chunk unloads and server restarts without chunk loading. Power loss and channel exhaustion do not turn protection off.
 
 ### Hardware protection
 
