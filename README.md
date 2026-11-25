@@ -3,7 +3,7 @@
 ME Security is a NeoForge addon for Applied Energistics 2 that restores a classic-inspired ME Security Terminal. The terminal is an AE2 cable part; attaching it makes an ME grid private to its owner and lets that owner grant per-player access.
 
 The current stable release is **1.0.0**. This checkout builds the unreleased
-**1.1.0-dev.2** candidate, whose protocol is incompatible with 1.0.0. See
+**1.1.0-dev.2** candidate, whose payload protocol (version 6) is incompatible with 1.0.0. See
 [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## Requirements
@@ -31,12 +31,13 @@ Only the owner can edit permissions or manage patterns. Transferring ownership o
 |---|---|
 | Insert | Deposit items and fluids through terminals, container interactions, and supported wireless shortcuts. |
 | Extract | Withdraw items and fluids, including network ingredients used by manual terminal crafting. |
-| Craft | Calculate, submit, pause, and cancel autocrafting jobs, and collect your own completed final products up to the requested quantity. |
+| Craft | Calculate, submit, pause, and cancel autocrafting jobs. Does not allow withdrawing the results. |
+| Collect | Withdraw your own completed final products, up to the requested quantity, without Extract. With reversible patterns (blocks and ingots, for example) this can turn network stock into withdrawable items, so grant it deliberately. |
 | Build | Place, remove, recolor, and configure native AE2 network hardware, including physical storage cells. |
 
 Changes affect subsequent server actions immediately. Reducing a player's permissions, including removing trust, closes their affected open ME screen. Permission buttons send individual toggle intents so multiple clicks during a slow connection are applied in order to the live server policy.
 
-Craft-only collection becomes available after the entire job finishes successfully. Its allowance is tied to the requesting player, the protected network's Security Terminal, and the exact final item or fluid; it is spent as products are withdrawn and survives server restarts. Canceled jobs, intermediate ingredients, byproducts, and other players' jobs grant no collection allowance. The player must still have Craft permission when collecting. Jobs started before installing this feature have no recorded allowance. Manual terminal crafting still requires Extract for network ingredients.
+Collect-only withdrawal becomes available after the entire job finishes successfully, and only for jobs the player started with Craft. Its allowance is tied to the requesting player, the protected network's Security Terminal, and the exact final item or fluid; it is spent as products are withdrawn and survives server restarts. Canceled jobs, intermediate ingredients, byproducts, and other players' jobs grant no collection allowance. The player must have Collect permission when withdrawing; Craft alone lets a player request jobs but not take the results. Jobs started before installing this feature have no recorded allowance. Manual terminal crafting still requires Extract for network ingredients. Worlds saved before Collect existed (saved-data format 3 or older) automatically grant Collect to every trusted player who has Craft, so their behavior is unchanged; format 4 data is never migrated again.
 
 Build follows actual connections: differently colored, disconnected cables do not require permission from a neighboring network, and isolated side parts in a block without a central cable are separate grids. Adding a center cable checks the internal parts it joins and exposed, compatible neighbors. Removing a part checks its own internal and outward nodes; mining a whole cable-bus block checks every part. Recoloring checks the current network and neighbors the new color would connect to, and rejects a merge containing multiple Security Terminals.
 

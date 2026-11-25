@@ -160,7 +160,7 @@ public final class SecurityAccess {
         if (decision == AccessDecision.ALLOW) return amount;
         var terminal = craftingTerminal(grid);
         if (terminal != null && player instanceof ServerPlayer serverPlayer
-                && check(grid, player, Permission.CRAFT, false) == AccessDecision.ALLOW) {
+                && check(grid, player, Permission.COLLECT, false) == AccessDecision.ALLOW) {
             long available = SecuritySavedData.get(serverPlayer.server).craftedAmount(terminal, player.getUUID(), key);
             if (available > 0) return Math.min(amount, available);
         }

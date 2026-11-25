@@ -46,6 +46,67 @@ class SecuritySavedDataTest {
         assertThrows(IllegalStateException.class, () -> restored.create(retired, owner));
     }
 
+    private static final int CRAFT_ONLY = Permission.VIEW.bit() | Permission.CRAFT.bit();
+
+    /** A world with a Craft-only guest, an Extract-only guest and a Collect-only guest on one terminal. */
+    private static SecuritySavedData collectWorld(UUID terminal, UUID owner, UUID crafter, UUID extractor, UUID collector) {
+        var data = new SecuritySavedData();
+        data.create(terminal, owner);
+        data.update(terminal, data.policy(terminal).trust(owner, crafter, CRAFT_ONLY)
+                .trust(owner, extractor, Permission.EXTRACT.bit())
+                .trust(owner, collector, Permission.COLLECT.bit()));
+        return data;
+    }
+
+    @Test void newDataIsWrittenAsFormatFour() {
+        assertEquals(4, new SecuritySavedData().save(new CompoundTag(), RegistryAccess.EMPTY).getInt("format"));
+    }
+
+    @Test void olderFormatsGrantCollectToEveryEntryWithCraft() {
+        var terminal = UUID.randomUUID();
+        var owner = UUID.randomUUID();
+        var crafter = UUID.randomUUID();
+        var extractor = UUID.randomUUID();
+        var collector = UUID.randomUUID();
+        var saved = collectWorld(terminal, owner, crafter, extractor, collector)
+                .save(new CompoundTag(), RegistryAccess.EMPTY);
+        // Format 3 and a file with no format at all predate Collect and take the Craft-implies-Collect migration.
+        for (var version : new int[] {3, 2, -1}) {
+            var legacy = saved.copy();
+            if (version < 0) legacy.remove("format");
+            else legacy.putInt("format", version);
+            var policy = SecuritySavedData.load(legacy, RegistryAccess.EMPTY).policy(terminal);
+            assertEquals(CRAFT_ONLY | Permission.COLLECT.bit(), policy.permissions(crafter), "format " + version);
+            assertTrue(policy.allows(crafter, Permission.COLLECT));
+            assertEquals(Permission.VIEW.bit() | Permission.EXTRACT.bit(), policy.permissions(extractor));
+            assertFalse(policy.allows(extractor, Permission.COLLECT));
+            assertEquals(Permission.VIEW.bit() | Permission.COLLECT.bit(), policy.permissions(collector));
+        }
+    }
+
+    @Test void formatFourDataIsNotMigratedAgain() {
+        var terminal = UUID.randomUUID();
+        var owner = UUID.randomUUID();
+        var crafter = UUID.randomUUID();
+        var saved = collectWorld(terminal, owner, crafter, UUID.randomUUID(), UUID.randomUUID())
+                .save(new CompoundTag(), RegistryAccess.EMPTY);
+        assertEquals(4, saved.getInt("format"));
+        var policy = SecuritySavedData.load(saved, RegistryAccess.EMPTY).policy(terminal);
+        assertEquals(CRAFT_ONLY, policy.permissions(crafter), "an owner's Craft-without-Collect choice survives");
+        assertFalse(policy.allows(crafter, Permission.COLLECT));
+
+        // Migrating once, then the owner removing Collect, must survive further save and load cycles.
+        var legacy = saved.copy();
+        legacy.putInt("format", 3);
+        var migrated = SecuritySavedData.load(legacy, RegistryAccess.EMPTY);
+        migrated.update(terminal, migrated.policy(terminal).trust(owner, crafter, CRAFT_ONLY));
+        var resaved = migrated.save(new CompoundTag(), RegistryAccess.EMPTY);
+        assertEquals(4, resaved.getInt("format"));
+        var reloaded = SecuritySavedData.load(resaved, RegistryAccess.EMPTY);
+        assertFalse(reloaded.policy(terminal).allows(crafter, Permission.COLLECT));
+        assertEquals(resaved, reloaded.save(new CompoundTag(), RegistryAccess.EMPTY));
+    }
+
     /** One live terminal, one tombstone and one directory entry, as written to disk. */
     private static CompoundTag savedWorld() {
         var data = new SecuritySavedData();
