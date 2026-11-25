@@ -81,7 +81,7 @@ class TerminalIdentityTest {
         data.setLocation(UUID.randomUUID(), ELSEWHERE);
 
         var serialized = data.save(new CompoundTag(), RegistryAccess.EMPTY);
-        assertEquals(3, serialized.getInt("format"), "locations must not change the saved-data format");
+        assertEquals(SecuritySavedData.FORMAT, serialized.getInt("format"), "locations must not change the saved-data format");
         var restored = SecuritySavedData.load(serialized, RegistryAccess.EMPTY);
         assertEquals(ORIGINAL, restored.location(located));
         assertNull(restored.location(legacy), "a policy without a location stays unknown");
