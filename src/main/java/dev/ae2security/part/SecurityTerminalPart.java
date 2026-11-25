@@ -75,9 +75,17 @@ public final class SecurityTerminalPart extends AbstractDisplayPart implements M
 
         var node = getGridNode();
         var ownerId = node == null ? null : node.getOwningPlayerProfileId();
-        if (ownerId == null) return;
-
         var data = SecuritySavedData.get(level.getServer());
+        if (ownerId == null) {
+            // Nobody can ever own this terminal, and a policy-less identity on the grid would deny everyone.
+            data.retire(terminalId);
+            awaitingInitialOwner = false;
+            getHost().markForSave();
+            LOGGER.warn("ME Security Terminal {} at {} in {} was placed without an owning player, so it protects "
+                    + "nothing and its identity was retired.", terminalId, getBlockEntity().getBlockPos(),
+                    level.dimension().location());
+            return;
+        }
         data.create(terminalId, ownerId);
         data.setLocation(terminalId, location());
         policyCreatedTick = level.getServer().getTickCount();
@@ -102,7 +110,7 @@ public final class SecurityTerminalPart extends AbstractDisplayPart implements M
         var ownerId = node == null ? null : node.getOwningPlayerProfileId();
         if (ownerId == null) {
             LOGGER.warn("ME Security Terminal {} at {} in {} has no saved policy and no recorded placer. "
-                    + "It stays locked until an administrator removes the block.", terminalId, position, dimension);
+                    + "It stays locked until an administrator runs /mesecurity retire {} or removes the block.", terminalId, position, dimension, terminalId);
             return;
         }
         data.create(terminalId, ownerId);

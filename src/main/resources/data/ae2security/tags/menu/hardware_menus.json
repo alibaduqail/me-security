@@ -1,0 +1,25 @@
+{
+  "replace": false,
+  "values": [
+    "ae2:drive",
+    "ae2:me_chest",
+    "ae2:ioport",
+    "ae2:priority",
+    "ae2:storagebus",
+    "ae2:import_bus",
+    "ae2:export_bus",
+    "ae2:formationplane",
+    "ae2:interface",
+    "ae2:set_stock_amount",
+    "ae2:molecular_assembler",
+    "ae2:energy_level_emitter",
+    "ae2:storage_level_emitter",
+    "ae2:qnb",
+    "ae2:spatialanchor",
+    "ae2:spatialioport",
+    "ae2:wireless_access_point",
+    "ae2:vibrationchamber",
+    "ae2:inscriber",
+    "ae2:condenser"
+  ]
+}
