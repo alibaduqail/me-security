@@ -48,7 +48,7 @@ public final class SecurityWorldEvents {
                     var pos = blockEntity.getBlockPos();
                     if (pos.getX() < min.getX() || pos.getX() > max.getX() || pos.getY() < min.getY()
                             || pos.getY() > max.getY() || pos.getZ() < min.getZ() || pos.getZ() > max.getZ()
-                            || !SecurityHardware.nativeHost(blockEntity)) continue;
+                            || !SecurityHardware.gridHost(blockEntity)) continue;
                     var networks = SecurityHardware.networks(blockEntity);
                     if (networks.unresolved) return false;
                     for (var grid : networks.grids) {

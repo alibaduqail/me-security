@@ -263,13 +263,17 @@ public final class SecurityPlacement {
         if (!SecurityHardware.loaded(level, pos)) return false;
         var current = level.getBlockEntity(pos);
         var next = state.getBlock() instanceof AEBaseEntityBlock<?> block ? block.newBlockEntity(pos, state) : null;
-        if (!SecurityHardware.nativeHost(current) && !SecurityHardware.nativeHost(next)) return true;
+        if (!SecurityHardware.gridHost(current) && !SecurityHardware.gridHost(next)) return true;
         if (!SecurityBreak.allowBlockBreak(current, player)) return deny(player, pos);
         var networks = SecurityHardware.networks(current);
         if (next instanceof IGridConnectedBlockEntity connected && calculator(next) == null) {
             for (var side : connected.getGridConnectableSides(BlockOrientation.get(state))) {
                 collectNeighbor(level, pos, side, AEColor.TRANSPARENT, networks);
             }
+        } else if (SecurityHardware.gridHost(next) && !(next instanceof appeng.blockentity.networking.CableBusBlockEntity)
+                && calculator(next) == null) {
+            // An add-on host does not declare its connectable sides before it exists; assume every side joins.
+            for (var side : Direction.values()) collectNeighbor(level, pos, side, AEColor.TRANSPARENT, networks);
         }
 
         var previews = new java.util.HashSet<PreviewBounds>();

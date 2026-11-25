@@ -1,0 +1,16 @@
+{
+  "replace": false,
+  "values": [
+    "ae2:cellworkbench",
+    "ae2:controller_networkstatus",
+    "ae2:networkstatus",
+    "ae2:networktool",
+    "ae2:pattern_provider",
+    "ae2:patternaccessterminal",
+    "ae2:patternterm",
+    "ae2:quartzknife",
+    "ae2:skychest",
+    { "id": "ae2wtlib:wireless_pattern_encoding_terminal", "required": false },
+    { "id": "ae2wtlib:wireless_pattern_access_terminal", "required": false }
+  ]
+}
