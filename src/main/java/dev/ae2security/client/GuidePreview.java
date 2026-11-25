@@ -40,6 +40,7 @@ public final class GuidePreview {
         if (page == null) throw new IllegalStateException("Security Terminal guide failed to compile");
         LoggerFactory.getLogger(GuidePreview.class).info("Security Terminal GuideME page, navigation and item link loaded. Compiled text:\n{}",
                 page.document().getTextContent());
+
         GuidesCommon.openGuide(minecraft.player, guide.getId(), PageAnchor.page(pageId));
     }
 }

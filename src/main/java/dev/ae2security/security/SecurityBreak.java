@@ -12,6 +12,7 @@ import dev.ae2security.part.SecurityTerminalPart;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.BlockHitResult;
 
 /** Authorizes player-driven removal of parts from a protected AE2 cable bus. */
@@ -29,29 +30,37 @@ public final class SecurityBreak {
         } finally {
             AppEng.instance().setPartInteractionPlayer(null);
         }
-        if (selected.part instanceof SecurityTerminalPart terminal) {
+        if (selected.part instanceof SecurityTerminalPart terminal && !retired(terminal, player)) {
             return allowTerminalRemoval(terminal, player);
         }
 
-        var grids = Collections.newSetFromMap(new IdentityHashMap<IGrid, Boolean>());
+        var networks = new SecurityHardware.Networks();
         if (selected.part != null) {
-            addGrid(selected.part, grids);
+            // A Cable Anchor has no node of its own; it is authorized through its cable.
+            SecurityHardware.collect(selected.part, host, networks);
         } else if (selected.facade != null && host.getPart(null) != null) {
-            addGrid(host.getPart(null), grids);
+            SecurityHardware.collect(host.getPart(null), networks);
         }
-        return allowBuild(grids, player);
+        if (!SecurityHardware.allowBuild(networks, player)) return false;
+        // Freeing a cable face lets the center cable connect to whatever that face exposes.
+        return selected.part == null || selected.side == null
+                || SecurityPlacement.allowExposedSide(host, selected.side, player);
     }
 
-    public static boolean allowBlockBreak(CableBusBlockEntity host, Player player) {
+    public static boolean allowBlockBreak(BlockEntity blockEntity, Player player) {
         if (player.level().isClientSide()) return true;
+        if (!(blockEntity instanceof CableBusBlockEntity host)) {
+            return SecurityHardware.allowBuild(blockEntity, player);
+        }
 
         for (var part : parts(host)) {
-            if (part instanceof SecurityTerminalPart terminal && !isTerminalOwner(terminal, player)) {
+            if (part instanceof SecurityTerminalPart terminal && !retired(terminal, player)
+                    && !isTerminalOwner(terminal, player)) {
                 SecurityAccess.notice(player, Component.translatable("message.ae2security.terminal_break_owner"));
                 return false;
             }
         }
-        return allowBuild(grids(host), player);
+        return SecurityHardware.allowBuild(host, player);
     }
 
     private static boolean allowTerminalRemoval(SecurityTerminalPart terminal, Player player) {
@@ -67,24 +76,10 @@ public final class SecurityBreak {
         return policy != null && policy.isOwner(player.getUUID());
     }
 
-    private static boolean allowBuild(Set<IGrid> grids, Player player) {
-        for (var grid : grids) {
-            if (grid.getService(ISecurityGrid.class).terminalIds().isEmpty()) continue;
-            var decision = SecurityAccess.check(grid, player, Permission.BUILD, false);
-            if (decision != AccessDecision.ALLOW) {
-                SecurityAccess.notice(player, decision == AccessDecision.DENIED
-                        ? Component.translatable("message.ae2security.break_denied")
-                        : Component.translatable(decision.translationKey()));
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static Set<IGrid> grids(CableBusBlockEntity host) {
-        var result = Collections.newSetFromMap(new IdentityHashMap<IGrid, Boolean>());
-        for (var part : parts(host)) addGrid(part, result);
-        return result;
+    /** A tombstoned identity protects nothing, so its leftover part is ordinary hardware. */
+    private static boolean retired(SecurityTerminalPart terminal, Player player) {
+        var server = player.getServer();
+        return server != null && SecuritySavedData.get(server).retired(terminal.terminalId());
     }
 
     private static Set<IPart> parts(CableBusBlockEntity host) {
@@ -98,10 +93,4 @@ public final class SecurityBreak {
         return result;
     }
 
-    private static void addGrid(IPart part, Set<IGrid> grids) {
-        var node = part.getGridNode();
-        if (node != null && node.getGrid() != null) grids.add(node.getGrid());
-        var external = part.getExternalFacingNode();
-        if (external != null && external.getGrid() != null) grids.add(external.getGrid());
-    }
 }

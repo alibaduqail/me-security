@@ -11,8 +11,8 @@ Each trusted player can receive individual **Insert**, **Extract**, **Craft**, a
 ## Made for shared bases
 
 - Protect a storage system while still letting teammates contribute.
-- Give builders cable access without exposing your stored items.
-- Let friends request autocrafting without allowing withdrawals.
+- Grant Build only to players trusted with network hardware and the contents of removable storage cells.
+- Let friends request autocrafting and collect only their own completed results, up to the requested amount.
 - Use the same rules from supported wired and wireless AE2 terminals.
 
 The terminal is an AE2 cable part, uses one channel, and has an in-game guide page and crafting recipe. Its policy remains in place through server restarts and unloaded chunks.
@@ -21,4 +21,6 @@ The terminal is an AE2 cable part, uses one channel, and has an in-game guide pa
 
 Built for **Minecraft 1.21.1**, **NeoForge**, and **Applied Energistics 2**. Support for **AE2 Wireless Terminals** is available when installed.
 
-> ME Security controls player access to supported ME-network actions and cable parts. It is not a land-claim mod, so protect the rest of your base with your preferred protection mod.
+The terminal also protects ordinary AE2 network hardware from unauthorized mining, wrenching, configuration, and explosions. Protected storage disks are managed manually by players with Build permission; normal item and fluid automation continues.
+
+> Coverage applies to native AE2 network hardware. External inventories, machine outputs, arbitrary third-party movers, and administrative commands remain outside its protection.
