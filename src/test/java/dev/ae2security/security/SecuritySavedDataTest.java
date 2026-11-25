@@ -321,7 +321,7 @@ class SecuritySavedDataTest {
                 new SecuritySavedData.ChunkKey("minecraft:the_nether", 1, 2)), c -> false);
         data.reconcileChunks(terminal, Set.of(chunk(0, 0)), c -> c.x() == 7);
         var saved = data.save(new CompoundTag(), RegistryAccess.EMPTY);
-        assertEquals(3, saved.getInt("format"));
+        assertEquals(SecuritySavedData.FORMAT, saved.getInt("format"));
         var restored = SecuritySavedData.load(saved, RegistryAccess.EMPTY);
         assertEquals(Set.of(chunk(0, 0), new SecuritySavedData.ChunkKey("minecraft:the_nether", 1, 2)),
                 restored.footprint(terminal));
