@@ -1,82 +1,64 @@
 package dev.ae2security.client;
 
 import java.util.EnumMap;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
 import com.mojang.blaze3d.platform.InputConstants;
 
+import appeng.client.Point;
 import appeng.client.gui.Icon;
+import appeng.client.gui.style.BackgroundGenerator;
+import appeng.client.gui.style.PaletteColor;
 import appeng.client.gui.style.ScreenStyle;
 import appeng.client.gui.style.StyleManager;
 import appeng.client.gui.widgets.AE2Button;
 import appeng.client.gui.widgets.AETextField;
-import appeng.client.gui.widgets.TabButton;
 import appeng.client.gui.widgets.OpenGuideButton;
+import appeng.client.gui.widgets.VerticalButtonBar;
 import dev.ae2security.MESecurity;
-import guideme.GuidesCommon;
-import guideme.PageAnchor;
 import dev.ae2security.menu.SecurityMenu;
 import dev.ae2security.network.EditPolicy;
-import dev.ae2security.network.PolicySnapshot;
-import dev.ae2security.network.PolicyEditResult;
 import dev.ae2security.network.PlayerSearchResult;
+import dev.ae2security.network.PolicySnapshot;
 import dev.ae2security.security.OwnershipConfirmation;
 import dev.ae2security.security.Permission;
-import net.minecraft.client.gui.Font;
+import guideme.GuidesCommon;
+import guideme.PageAnchor;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 import net.neoforged.neoforge.network.PacketDistributor;
 
+/**
+ * The owner's management screen, laid out like an AE2 terminal: a framed AE2 background with
+ * the guide in AE2's left toolbar, a searchable player list with AE2's scrollbar (one notch
+ * per page of server results), and the selected player's access on the right.
+ */
 public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> {
     private static final int PAGE_SIZE = PlayerSearchResult.PAGE_SIZE;
-    private static final int PLAYER_LIST_WIDTH = 140;
-    private static final int SEARCH_FIELD_LEFT_INSET = 3;
-    private static final int SEARCH_FIELD_RIGHT_INSET = 5;
-    private static final int AE_TEXT_FIELD_TEXTURE_SIZE = 128;
-    // Vertical layout of the right-hand panel (y relative to the screen, inset panel is 38..226):
-    //   heading text 43..51; permission buttons 54 + 21 * row, 20 high: 54..74, 75..95, 96..116, 117..137, 138..158
-    //   trust button 160..178; transfer prompt / edit status text 180..188; name field 190..202;
-    //   transfer button 204..222. The player list pager (left panel) shares the 204..222 band.
-    private static final int PERMISSION_TOP = 54;
-    private static final int PERMISSION_ROW_HEIGHT = 21;
-    private static final int TRUST_BUTTON_Y = 160;
-    private static final int TRUST_BUTTON_Y_UNTRUSTED = 116;
-    private static final int TRANSFER_TEXT_Y = 180;
-    private static final int PANEL_TEXT_WIDTH = 128;
-    private static final int TRANSFER_NAME_Y = 190;
-    private static final int TRANSFER_BUTTON_Y = 204;
-    private static final int PLAYER_ROW_TOP = 74;
-    private static final int PLAYER_ROW_PITCH = 21;
-    private static final int PAGER_Y = 204;
-    private static final ResourceLocation AE_TEXT_FIELD_TEXTURE =
-            ResourceLocation.fromNamespaceAndPath("ae2", "textures/guis/text_field.png");
-
-    private static final int AE2_DARK = 0xFF413F54;
-    private static final int AE2_BACKGROUND = 0xFFCBCCD4;
-    private static final int AE2_PANEL = 0xFFB6B9C8;
-    private static final int AE2_HIGHLIGHT = 0xFFF2F2F2;
-    private static final int AE2_SHADOW = 0xFF878FA5;
-    private static final int AE2_MUTED_TEXT = 0xFF687087;
-    private static final int AE2_ACCENT = 0xFF9C8FD0;
-    private static final int STATUS_WARNING = 0xFF9B3E24;
 
     private final ScreenStyle style;
-    private final PlayerButton[] playerButtons = new PlayerButton[PAGE_SIZE];
-    private final Map<Permission, PermissionTabButton> permissionButtons = new EnumMap<>(Permission.class);
+    private final PlayerRowButton[] playerRows = new PlayerRowButton[PAGE_SIZE];
+    private final Map<Permission, PermissionSwitch> permissionSwitches = new EnumMap<>(Permission.class);
+    private final Rect2i searchBox;
+    private final Rect2i listBox;
+    private final Rect2i scrollBox;
+    private final Rect2i details;
 
     private AETextField search;
     private AETextField transferName;
-    private AE2Button previousPageButton;
-    private AE2Button nextPageButton;
     private AE2Button trustButton;
     private AE2Button transferButton;
+    private PlayerPageScroll pageScroll;
+    private AccessPanel access;
+    private VerticalButtonBar toolbar;
 
     private final PlayerListState players = new PlayerListState();
     private final PendingEdits edits = new PendingEdits();
@@ -86,28 +68,35 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
 
     public SecurityScreen(SecurityMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
-        this.style = StyleManager.loadStyleDoc("/screens/terminals/base_terminal.json");
-        imageWidth = 304;
-        imageHeight = 232;
+        this.style = StyleManager.loadStyleDoc("/screens/ae2security/security_terminal.json");
+        var frame = style.getGeneratedBackground();
+        imageWidth = frame.getWidth();
+        imageHeight = frame.getHeight();
+        searchBox = SecurityGui.box(style, "search", imageWidth, imageHeight);
+        listBox = SecurityGui.box(style, "playerList", imageWidth, imageHeight);
+        scrollBox = SecurityGui.box(style, "playerScrollbar", imageWidth, imageHeight);
+        details = SecurityGui.box(style, "details", imageWidth, imageHeight);
     }
 
     @Override
     protected void init() {
         super.init();
 
-        var help = addRenderableWidget(new OpenGuideButton(button -> {
+        var help = new OpenGuideButton(button -> {
             if (minecraft != null && minecraft.player != null) {
-                GuidesCommon.openGuide(minecraft.player, net.minecraft.resources.ResourceLocation.parse("ae2:guide"),
+                GuidesCommon.openGuide(minecraft.player, ResourceLocation.parse("ae2:guide"),
                         PageAnchor.page(MESecurity.id("security_terminal.md")));
             }
-        }));
-        help.setX(leftPos + imageWidth - 22);
-        help.setY(topPos + 5);
+        });
         help.setTooltip(Tooltip.create(Component.translatable("screen.ae2security.guide")));
+        toolbar = new VerticalButtonBar();
+        toolbar.add(help);
+        toolbar.setPosition(style.getWidget("verticalToolbar").resolve(new Rect2i(0, 0, imageWidth, imageHeight)));
+        toolbar.populateScreen(this::addRenderableWidget, new Rect2i(leftPos, topPos, imageWidth, imageHeight), null);
+        toolbar.updateBeforeRender();
 
-        search = addRenderableWidget(new FullWidthSearchField(
-                style, font, leftPos + 12 + SEARCH_FIELD_LEFT_INSET + 2, topPos + 54,
-                PLAYER_LIST_WIDTH - SEARCH_FIELD_LEFT_INSET - SEARCH_FIELD_RIGHT_INSET, 12));
+        search = addRenderableWidget(new FullWidthSearchField(style, font, leftPos + searchBox.getX(),
+                topPos + searchBox.getY(), searchBox.getWidth(), searchBox.getHeight()));
         search.setBordered(false);
         search.setMaxLength(64);
         search.setPlaceholder(Component.translatable("screen.ae2security.search"));
@@ -122,27 +111,28 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
 
         for (int row = 0; row < PAGE_SIZE; row++) {
             int rowIndex = row;
-            playerButtons[row] = addRenderableWidget(new PlayerButton(
-                    leftPos + 12, topPos + PLAYER_ROW_TOP + row * PLAYER_ROW_PITCH, PLAYER_LIST_WIDTH, 17, Component.empty(),
+            playerRows[row] = addRenderableWidget(new PlayerRowButton(style, leftPos + listBox.getX() + 1,
+                    topPos + listBox.getY() + 1 + row * (PlayerRowButton.HEIGHT + 1), listBox.getWidth() - 2,
                     button -> selectVisiblePlayer(rowIndex)));
         }
 
-        previousPageButton = ae2Button(12, PAGER_Y, 34, 18, Component.literal("<"), () -> turnPage(-1));
-        nextPageButton = ae2Button(118, PAGER_Y, 34, 18, Component.literal(">"), () -> turnPage(1));
+        pageScroll = new PlayerPageScroll(scrollBox, listBox);
 
+        access = new AccessPanel(style, font, details);
+        int left = leftPos + access.left();
+        int width = access.width();
         for (int row = 0; row < Permission.editable().size(); row++) {
             var permission = Permission.editable().get(row);
-            var button = new PermissionTabButton(permissionIcon(permission),
-                    Component.translatable("permission.ae2security."
-                            + permission.name().toLowerCase(Locale.ROOT)),
-                    pressed -> togglePermission(permission));
-            button.setX(leftPos + 270);
-            button.setY(topPos + PERMISSION_TOP + row * PERMISSION_ROW_HEIGHT);
-            permissionButtons.put(permission, addRenderableWidget(button));
+            var toggle = new PermissionSwitch(style, permissionIcon(permission),
+                    Component.translatable(permissionKey(permission)), left, topPos + access.permissionY(row),
+                    width, () -> togglePermission(permission));
+            permissionSwitches.put(permission, addRenderableWidget(toggle));
         }
 
-        trustButton = ae2Button(164, TRUST_BUTTON_Y, 128, 18, Component.empty(), this::toggleTrust);
-        transferName = addRenderableWidget(new AETextField(style, font, leftPos + 164, topPos + TRANSFER_NAME_Y, 128, 12));
+        trustButton = addRenderableWidget(new AE2Button(left, topPos + access.trustY(), width,
+                AccessPanel.BUTTON_HEIGHT, Component.empty(), button -> toggleTrust()));
+        transferName = addRenderableWidget(new AETextField(style, font, left, topPos + access.transferNameY(),
+                width, 12));
         transferName.setBordered(false);
         transferName.setMaxLength(64);
         transferName.setPlaceholder(Component.translatable("screen.ae2security.transfer_name"));
@@ -152,7 +142,8 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
             transferInput = value;
             refreshControls();
         });
-        transferButton = ae2Button(164, TRANSFER_BUTTON_Y, 128, 18, Component.empty(), this::transferOwnership);
+        transferButton = addRenderableWidget(new AE2Button(left, topPos + access.transferY(), width,
+                AccessPanel.BUTTON_HEIGHT, Component.empty(), button -> transferOwnership()));
         transferButton.setTooltip(Tooltip.create(Component.translatable("screen.ae2security.transfer_warning")));
 
         displayed = menu.snapshot();
@@ -161,9 +152,8 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         setInitialFocus(search);
     }
 
-    private AE2Button ae2Button(int x, int y, int width, int height, Component label, Runnable action) {
-        return addRenderableWidget(new AE2Button(leftPos + x, topPos + y, width, height, label,
-                button -> action.run()));
+    private static String permissionKey(Permission permission) {
+        return "permission.ae2security." + permission.name().toLowerCase(Locale.ROOT);
     }
 
     private static Icon permissionIcon(Permission permission) {
@@ -181,6 +171,12 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         players.turnPage(delta);
         clearTransferConfirmation();
         refreshControls();
+    }
+
+    /** The scrollbar moves one notch per page; follow it once the owner has moved it. */
+    private void followScrollbar() {
+        int target = pageScroll.page();
+        if (menu.snapshot() != null && target != players.page()) turnPage(target - players.page());
     }
 
     private void selectVisiblePlayer(int row) {
@@ -226,7 +222,7 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
     }
 
     private void refreshControls() {
-        if (playerButtons[0] == null) {
+        if (playerRows[0] == null) {
             return;
         }
 
@@ -235,7 +231,7 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         var visiblePlayers = players.players();
         var player = players.selection();
         for (int row = 0; row < PAGE_SIZE; row++) {
-            var button = playerButtons[row];
+            var button = playerRows[row];
             if (row >= visiblePlayers.size()) {
                 button.visible = false;
                 button.active = false;
@@ -243,24 +239,20 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
             }
 
             var listed = visiblePlayers.get(row);
-            String marker = listed.trusted() ? "+ " : "  ";
-            button.setMessage(Component.literal(marker + font.plainSubstrByWidth(listed.name(), 116)));
+            button.show(listed, player != null && listed.id().equals(player.id()));
             button.setTooltip(Tooltip.create(SecurityScreenText.playerTooltip(listed)));
-            button.setSelected(player != null && listed.id().equals(player.id()));
             button.visible = true;
             button.active = true;
         }
 
-        previousPageButton.active = !searchPending && players.page() > 0;
-        nextPageButton.active = !searchPending && players.page() < players.lastPage();
+        pageScroll.show(players.page(), players.lastPage(), searchPending);
 
         boolean trusted = player != null && player.trusted();
         for (var permission : Permission.editable()) {
             boolean enabled = player != null && permission.in(player.permissions());
-            String permissionKey = "permission.ae2security." + permission.name().toLowerCase(Locale.ROOT);
-            var button = permissionButtons.get(permission);
-            var name = Component.translatable(permissionKey);
-            var description = Component.translatable(permissionKey + ".description");
+            var button = permissionSwitches.get(permission);
+            var name = Component.translatable(permissionKey(permission));
+            var description = Component.translatable(permissionKey(permission) + ".description");
             button.setSelected(enabled);
             button.visible = trusted;
             button.active = trusted && !pending && !searchPending;
@@ -270,13 +262,12 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
                                     : "screen.ae2security.permission_disabled",
                             name))
                     .append("\n")
-                    .append(description)));
+                    .append(description.withStyle(ChatFormatting.GRAY))));
         }
 
         trustButton.setMessage(Component.translatable(pending
                 ? "screen.ae2security.pending"
                 : trusted ? "screen.ae2security.remove" : "screen.ae2security.trust"));
-        trustButton.setY(topPos + (trusted ? TRUST_BUTTON_Y : TRUST_BUTTON_Y_UNTRUSTED));
         trustButton.visible = player != null;
         trustButton.active = player != null && !pending && !searchPending;
 
@@ -341,6 +332,8 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
             if (edit == PendingEdits.Outcome.SUPERSEDED) players.refresh(false);
             refreshControls();
         }
+        pageScroll.tick();
+        followScrollbar();
         var request = menu.snapshot() == null ? null : players.poll(menu.containerId);
         if (request != null) PacketDistributor.sendToServer(request);
         var update = players.accept(menu.searchResult());
@@ -362,183 +355,101 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
+    private Point local(double mouseX, double mouseY) {
+        return new Point((int) mouseX - leftPos, (int) mouseY - topPos);
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (pageScroll.mouseClicked(local(mouseX, mouseY), button)) {
+            followScrollbar();
+            return true;
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (pageScroll.mouseDragged(local(mouseX, mouseY), button)) {
+            followScrollbar();
+            return true;
+        }
+        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        pageScroll.mouseReleased(local(mouseX, mouseY), button);
+        return super.mouseReleased(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (pageScroll.mouseScrolled(local(mouseX, mouseY), scrollY)) {
+            followScrollbar();
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+    }
+
     @Override
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
-        int x = leftPos;
-        int y = topPos;
-
-        drawRaisedPanel(graphics, x, y, imageWidth, imageHeight);
-        drawInsetPanel(graphics, x + 7, y + 38, 151, 188);
-        drawInsetPanel(graphics, x + 159, y + 38, 138, 188);
-    }
-
-    private static void drawRaisedPanel(GuiGraphics graphics, int x, int y, int width, int height) {
-        graphics.fill(x, y, x + width, y + height, AE2_DARK);
-        graphics.fill(x + 1, y + 1, x + width - 1, y + height - 1, AE2_HIGHLIGHT);
-        graphics.fill(x + 2, y + 2, x + width - 2, y + height - 3, AE2_BACKGROUND);
-        graphics.fill(x + 1, y + height - 3, x + width - 1, y + height - 1, AE2_SHADOW);
-    }
-
-    private static void drawInsetPanel(GuiGraphics graphics, int x, int y, int width, int height) {
-        graphics.fill(x, y, x + width, y + height, AE2_SHADOW);
-        graphics.fill(x + 1, y + 1, x + width - 1, y + height - 1, AE2_HIGHLIGHT);
-        graphics.fill(x + 1, y + 1, x + width - 2, y + height - 2, AE2_PANEL);
+        BackgroundGenerator.draw(imageWidth, imageHeight, graphics, leftPos, topPos);
+        // Like AEBaseScreen: the toolbar tab is drawn over the frame's left edge.
+        toolbar.drawBackgroundLayer(graphics, new Rect2i(leftPos, topPos, imageWidth, imageHeight),
+                new Point(mouseX - leftPos, mouseY - topPos));
+        SecurityGui.well(graphics, style, leftPos + listBox.getX(), topPos + listBox.getY(),
+                listBox.getWidth(), listBox.getHeight());
+        SecurityGui.well(graphics, style, leftPos + scrollBox.getX(), topPos + scrollBox.getY(),
+                scrollBox.getWidth(), scrollBox.getHeight());
     }
 
     @Override
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
-        graphics.drawString(font, title, 9, 9, AE2_DARK, false);
+        int text = SecurityGui.color(style, PaletteColor.DEFAULT_TEXT_COLOR);
+        int muted = SecurityGui.color(style, PaletteColor.MUTED_TEXT_COLOR);
+        SecurityGui.text(graphics, font, title, 8, 6, text);
+        pageScroll.draw(graphics, new Rect2i(0, 0, imageWidth, imageHeight),
+                new Point(mouseX - leftPos, mouseY - topPos));
 
         var snapshot = menu.snapshot();
         if (snapshot == null) {
-            graphics.drawString(font, Component.translatable("screen.ae2security.loading"), 9, 24,
-                    AE2_MUTED_TEXT, false);
+            SecurityGui.text(graphics, font, Component.translatable("screen.ae2security.loading"), 8, 17, muted);
+            drawListMessage(graphics, Component.translatable("screen.ae2security.loading"));
             return;
         }
 
-        graphics.drawString(font,
-                font.plainSubstrByWidth(Component.translatable("screen.ae2security.owner", snapshot.ownerName()).getString(), 190),
-                9, 24, AE2_MUTED_TEXT, false);
+        SecurityGui.networkStatus(graphics, style, font, snapshot.status(), imageWidth - 8, 6);
+        int ownerWidth = imageWidth - 16;
+        SecurityGui.text(graphics, font, font.plainSubstrByWidth(
+                Component.translatable("screen.ae2security.owner", snapshot.ownerName()).getString(), ownerWidth),
+                8, 17, muted);
 
-        if (!snapshot.status().equals("protected")) {
-            var status = Component.translatable("screen.ae2security." + snapshot.status());
-            graphics.drawString(font, status, imageWidth - 9 - font.width(status), 24, STATUS_WARNING, false);
-        }
-
-        graphics.drawString(font, Component.translatable("screen.ae2security.players"), 12, 43, AE2_DARK, false);
-
-        var selectedPlayer = players.selection();
-        String accessHeading = selectedPlayer == null
-                ? Component.translatable("screen.ae2security.select").getString()
-                : SecurityScreenText.firstThatFits(List.of(
-                        Component.translatable("screen.ae2security.access_for", selectedPlayer.name()).getString(),
-                        selectedPlayer.name()), PANEL_TEXT_WIDTH, font::width);
-        graphics.drawString(font, font.plainSubstrByWidth(accessHeading, PANEL_TEXT_WIDTH), 164, 43,
-                selectedPlayer == null ? AE2_MUTED_TEXT : AE2_DARK, false);
-
-        if (selectedPlayer != null && selectedPlayer.trusted()) {
-            for (int row = 0; row < Permission.editable().size(); row++) {
-                var permission = Permission.editable().get(row);
-                var label = Component.translatable(
-                        "permission.ae2security." + permission.name().toLowerCase(Locale.ROOT));
-                graphics.drawString(font, label, 165,
-                        PERMISSION_TOP + 4 + row * PERMISSION_ROW_HEIGHT,
-                        AE2_DARK, false);
-            }
-        }
-
-        // The prompt and the edit status share one line; the status wins while an edit is pending.
-        if (selectedPlayer != null && selectedPlayer.id().equals(transferConfirmation) && !edits.pending()) {
-            var name = selectedPlayer.name();
-            var prompt = SecurityScreenText.firstThatFits(List.of(
-                    Component.translatable("screen.ae2security.transfer_prompt", name).getString(),
-                    Component.translatable("screen.ae2security.transfer_prompt_short", name).getString(),
-                    name), PANEL_TEXT_WIDTH, font::width);
-            graphics.drawString(font, font.plainSubstrByWidth(prompt, PANEL_TEXT_WIDTH), 164, TRANSFER_TEXT_Y,
-                    AE2_MUTED_TEXT, false);
-        }
-
-        String pages = (players.page() + 1) + " / " + (players.lastPage() + 1);
-        drawCenteredFlat(graphics, Component.literal(pages), 82, PAGER_Y + 5, AE2_DARK);
         if (players.players().isEmpty()) {
-            drawCenteredFlat(graphics, Component.translatable(players.searching()
-                    ? "screen.ae2security.searching" : "screen.ae2security.no_players"), 82, 98,
-                    AE2_MUTED_TEXT);
+            drawListMessage(graphics, Component.translatable(players.searching()
+                    ? "screen.ae2security.searching" : "screen.ae2security.no_players"));
         }
-        boolean pending = edits.pending();
-        var editStatus = edits.status();
-        if (pending || editStatus != null && transferConfirmation == null) {
-            var status = Component.translatable(pending ? "screen.ae2security.pending"
-                    : "screen.ae2security.edit_result." + editStatus.name().toLowerCase(Locale.ROOT));
-            graphics.drawString(font, font.plainSubstrByWidth(status.getString(), 128),
-                    164, TRANSFER_TEXT_Y, editStatus == PolicyEditResult.Result.APPLIED ? AE2_DARK : STATUS_WARNING, false);
-        }
+        int footerY = listBox.getY() + listBox.getHeight() + 3;
+        SecurityGui.text(graphics, font, Component.translatable("screen.ae2security.players"),
+                listBox.getX() + 1, footerY, muted);
+        String pages = (players.page() + 1) + " / " + (players.lastPage() + 1);
+        SecurityGui.text(graphics, font, pages,
+                scrollBox.getX() + scrollBox.getWidth() - font.width(pages), footerY, muted);
 
+        access.draw(graphics, players.selection(), transferConfirmation, edits.pending(), edits.status());
     }
 
-    /** Centered like drawCenteredString, but without its drop shadow, matching the screen's other labels. */
-    private void drawCenteredFlat(GuiGraphics graphics, Component text, int centerX, int y, int color) {
-        graphics.drawString(font, text, centerX - font.width(text) / 2, y, color, false);
+    private void drawListMessage(GuiGraphics graphics, Component message) {
+        int centerX = listBox.getX() + listBox.getWidth() / 2;
+        int y = listBox.getY() + (listBox.getHeight() - font.lineHeight) / 2;
+        SecurityGui.wrappedCentered(graphics, font, message, centerX, y, listBox.getWidth() - 8,
+                SecurityGui.color(style, PaletteColor.DEFAULT_TEXT_COLOR));
     }
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        toolbar.updateBeforeRender();
         super.render(graphics, mouseX, mouseY, partialTick);
         renderTooltip(graphics, mouseX, mouseY);
-    }
-
-    /** A TabButton with a compact raised/off and pressed/on background. */
-    private static final class PermissionTabButton extends TabButton {
-        PermissionTabButton(Icon icon, Component message, OnPress onPress) {
-            super(icon, message, onPress);
-            setStyle(Style.BOX);
-            setDisableBackground(true);
-        }
-
-        @Override
-        public void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-            if (!visible) return;
-            int x = getX();
-            int y = getY();
-            if (isSelected()) {
-                graphics.fill(x, y, x + 20, y + 20, AE2_DARK);
-                graphics.fill(x + 1, y + 1, x + 19, y + 19, AE2_SHADOW);
-                graphics.fill(x + 2, y + 2, x + 19, y + 19, AE2_ACCENT);
-                graphics.fill(x + 2, y + 18, x + 19, y + 19, AE2_HIGHLIGHT);
-                graphics.fill(x + 18, y + 2, x + 19, y + 19, AE2_HIGHLIGHT);
-            } else {
-                drawRaisedPanel(graphics, x, y, 20, 20);
-            }
-            super.renderWidget(graphics, mouseX, mouseY, partialTick);
-        }
-    }
-
-    /** Fills AE2's 128px texture middle while retaining the full editor width. */
-    private static final class FullWidthSearchField extends AETextField {
-        FullWidthSearchField(ScreenStyle style, Font font, int x, int y, int width, int height) {
-            super(style, font, x, y, width, height);
-        }
-
-        @Override
-        public void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-            if (visible) {
-                var area = getTooltipArea();
-                int extension = area.getWidth() - AE_TEXT_FIELD_TEXTURE_SIZE;
-                if (extension > 0) graphics.blit(AE_TEXT_FIELD_TEXTURE,
-                        area.getX() + 127, area.getY(), extension, 12,
-                        1, isFocused() ? 24 : 0, 1, 12,
-                        AE_TEXT_FIELD_TEXTURE_SIZE, AE_TEXT_FIELD_TEXTURE_SIZE);
-            }
-            super.renderWidget(graphics, mouseX, mouseY, partialTick);
-        }
-    }
-
-    /** AE2 player-row button with a persistent accent outline for the active selection. */
-    private static final class PlayerButton extends AE2Button {
-        private boolean selected;
-
-        PlayerButton(int x, int y, int width, int height, Component message, OnPress onPress) {
-            super(x, y, width, height, message, onPress);
-        }
-
-        void setSelected(boolean selected) {
-            this.selected = selected;
-        }
-
-        @Override
-        protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-            super.renderWidget(graphics, mouseX, mouseY, partialTick);
-            if (!selected) return;
-
-            int x = getX();
-            int y = getY();
-            int right = x + getWidth();
-            int bottom = y + getHeight();
-            int top = isHovered() ? y : y - 1;
-            graphics.fill(x - 1, top, right + 1, top + 1, AE2_ACCENT);
-            graphics.fill(x - 1, bottom, right + 1, bottom + 1, AE2_ACCENT);
-            graphics.fill(x - 1, y, x, bottom, AE2_ACCENT);
-            graphics.fill(right, y, right + 1, bottom, AE2_ACCENT);
-        }
     }
 }
