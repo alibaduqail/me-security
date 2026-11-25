@@ -25,6 +25,8 @@ The dependency ranges are deliberately exact. ME Security uses version-targeted 
 
 Attach the terminal to an ME cable or a compatible device face, just like an ordinary AE2 terminal. It shares the cable-bus block with cables and other parts and uses one channel. The player who places a fresh terminal becomes its owner. Terminals must be placed by a player, not a machine such as a deployer. Right-click the terminal to open its management screen, search players previously seen by the server, and grant or remove trust. Trust always includes permission to open and view the network; a newly trusted player starts without any additional permissions.
 
+Only a player who helped build a network can secure it: placing a terminal on an existing network requires owning at least one of its nodes, while networks where no node has a recorded owner (machine-placed hardware, very old worlds) stay open to anyone. The same rule stops you from joining your protected network to someone else's unprotected network with a cable. Extending your own network is unaffected.
+
 Only the owner can edit permissions or manage patterns. Transferring ownership opens a confirmation field that requires the selected player's name. Trusted entries remain after transfer, while the previous owner loses access unless the new owner trusts them later.
 
 | Permission | Effect |
