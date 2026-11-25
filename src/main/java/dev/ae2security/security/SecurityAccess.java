@@ -17,6 +17,7 @@ import appeng.menu.me.crafting.*;
 import appeng.menu.me.items.PatternEncodingTermMenu;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -24,7 +25,9 @@ import net.minecraft.world.entity.player.Player;
 
 /** The common server authorization entry point for menus, storage, crafting and shortcuts. */
 public final class SecurityAccess {
-    private static final Map<Player, Long> LAST_NOTICE = Collections.synchronizedMap(new WeakHashMap<>());
+    /** Per-player, per-message tick of the last notice shown; each player's inner map is bounded. */
+    private static final Map<Player, Map<String, Long>> LAST_NOTICE = Collections.synchronizedMap(new WeakHashMap<>());
+    private static final int MAX_NOTICE_KEYS = 32;
     private static final Set<String> STORAGE_MENUS = Set.of("item_terminal", "craftingterm", "wirelessterm",
             "wirelesscraftingterm", "basic_cell_chest", "portable_item_cell", "portable_fluid_cell");
     private static final Set<String> HARDWARE_MENUS = Set.of("drive", "me_chest", "ioport", "priority",
@@ -266,10 +269,19 @@ public final class SecurityAccess {
     public static void notice(Player player, Component message) {
         if (!(player instanceof ServerPlayer serverPlayer)) return;
         long tick = serverPlayer.server.getTickCount();
-        Long previous = LAST_NOTICE.get(player);
-        if (previous == null || tick - previous >= 20 || tick < previous) {
-            player.displayClientMessage(message, true);
-            LAST_NOTICE.put(player, tick);
+        String key = message.getContents() instanceof TranslatableContents translatable
+                ? translatable.getKey()
+                : message.getString();
+        boolean show;
+        synchronized (LAST_NOTICE) {
+            Map<String, Long> perMessage = LAST_NOTICE.computeIfAbsent(player, p -> new HashMap<>());
+            Long previous = perMessage.get(key);
+            show = previous == null || tick - previous >= 20 || tick < previous;
+            if (show) {
+                if (perMessage.size() >= MAX_NOTICE_KEYS && !perMessage.containsKey(key)) perMessage.clear();
+                perMessage.put(key, tick);
+            }
         }
+        if (show) player.displayClientMessage(message, true);
     }
 }
