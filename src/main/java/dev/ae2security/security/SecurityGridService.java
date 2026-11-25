@@ -26,6 +26,12 @@ public final class SecurityGridService implements ISecurityGrid, IGridServicePro
      */
     private final List<IGridNode> terminalNodes = new ArrayList<>();
     private final Set<UUID> inherited = new HashSet<>();
+    /**
+     * Identities that a copied terminal on this grid carried before it received its own. Nodes copied with
+     * it carry them as saved hints and may join over the next ticks; those hints are dropped until the
+     * grid has been stable for a few ticks.
+     */
+    private final Set<UUID> disowned = new HashSet<>();
     /** False only while every node's hints are known to equal {@link #inherited}. */
     private boolean hintsStale;
     /** Chunks of all in-world nodes, or null when an in-world node joined or left since it was built. */
@@ -54,6 +60,7 @@ public final class SecurityGridService implements ISecurityGrid, IGridServicePro
         var ids = new HashSet<UUID>();
         if (savedData != null) {
             for (var entry : savedData.getList(TAG, Tag.TAG_INT_ARRAY)) ids.add(NbtUtils.loadUUID(entry));
+            if (!disowned.isEmpty()) ids.removeAll(disowned);
         }
         boolean terminalNode = false;
         if (node.getOwner() instanceof SecurityTerminalPart terminal) {
@@ -86,6 +93,23 @@ public final class SecurityGridService implements ISecurityGrid, IGridServicePro
                 return;
             }
         }
+    }
+
+    /**
+     * A terminal on this grid was found to be a copy and now carries its own identity. The grid was only
+     * associated with the copied identity through data copied along with the terminal, so it is removed
+     * from every hint unless the copied identity's own terminal is on this grid as well.
+     */
+    public void disownCopiedIdentity(UUID copied) {
+        for (int i = 0; i < terminalNodes.size(); i++) {
+            if (terminalId(terminalNodes.get(i)).equals(copied)) return;
+        }
+        disowned.add(copied);
+        if (server != null) stableAfter = Math.max(stableAfter, server.getTickCount() + 5L);
+        inherited.remove(copied);
+        nodes.forEach((node, hints) -> {
+            if (hints.remove(copied)) ((appeng.me.GridNode) node).callListener(IGridNodeListener::onSaveChanges);
+        });
     }
 
     @Override
@@ -232,6 +256,7 @@ public final class SecurityGridService implements ISecurityGrid, IGridServicePro
     @Override
     public void onServerEndTick() {
         if (server == null || nodes.isEmpty()) return;
+        if (!disowned.isEmpty() && server.getTickCount() >= stableAfter) disowned.clear();
         // Nothing below can have an effect for a grid without identities whose hints are all in sync.
         if (terminalNodes.isEmpty() && inherited.isEmpty() && !hintsStale) return;
         var data = SecuritySavedData.get(server);
