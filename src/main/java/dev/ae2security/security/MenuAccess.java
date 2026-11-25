@@ -70,7 +70,8 @@ public enum MenuAccess {
      */
     public int relevantPermissions() {
         return switch (this) {
-            case STORAGE -> Permission.VIEW.bit() | Permission.INSERT.bit() | Permission.EXTRACT.bit();
+            case STORAGE -> Permission.VIEW.bit() | Permission.INSERT.bit() | Permission.EXTRACT.bit()
+                    | Permission.COLLECT.bit();
             case CRAFTING_REQUEST, STATUS -> Permission.CRAFT.bit() | Permission.VIEW.bit();
             case HARDWARE, FALLBACK -> Permission.BUILD.bit() | Permission.VIEW.bit();
             case OWNER -> 0; // Ownership changes are caught by the menu failing to reopen.
