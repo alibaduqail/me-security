@@ -82,7 +82,7 @@ public final class SecurityCommands {
             return fail(source, "commands.ae2security.info.no_block");
         }
         var host = player.level().getBlockEntity(block.getBlockPos());
-        if (!SecurityHardware.nativeHost(host)) return fail(source, "commands.ae2security.info.not_network");
+        if (!SecurityHardware.gridHost(host)) return fail(source, "commands.ae2security.info.not_network");
 
         var networks = SecurityHardware.networks(host);
         var ids = new TreeSet<UUID>();
