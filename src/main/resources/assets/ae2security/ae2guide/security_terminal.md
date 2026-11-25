@@ -114,6 +114,11 @@ terminal is removed. Each owner can still open their own terminal's management s
 Removing the Security Terminal ends its policy. Its dropped item is fresh and binds
 to the player who next places it.
 
+Operators can recover a network whose owner is gone with `/mesecurity`: `info` shows a
+terminal's owner and trusted players, `setowner` hands it to another player, `retire`
+ends its policy, and `bypass` toggles a personal admin bypass. A terminal placed with no
+owning player protects nothing.
+
 ## Hardware and explosion protection
 
 Ordinary drives, controllers, crafting CPUs, quantum bridges, spatial devices, cables,
@@ -130,6 +135,5 @@ it does not depend on power or channels.
 ## Protection limits
 
 Coverage applies to AE2 network hardware, including add-on blocks that host AE2 grid
-nodes. Arbitrary third-party tools or movers,
-administrative commands, external inventories, and machine outputs remain outside
-its protection scope.
+nodes. Arbitrary third-party tools or movers, world-editing commands such as `/setblock`,
+external inventories, and machine outputs remain outside its protection scope.
