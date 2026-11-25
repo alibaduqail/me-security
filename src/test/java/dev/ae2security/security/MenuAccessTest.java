@@ -14,7 +14,7 @@ class MenuAccessTest {
     @Test void relevantPermissionsPerMenuKind() {
         int view = Permission.VIEW.bit(), insert = Permission.INSERT.bit(), extract = Permission.EXTRACT.bit();
         int craft = Permission.CRAFT.bit(), build = Permission.BUILD.bit();
-        assertEquals(view | insert | extract, MenuAccess.STORAGE.relevantPermissions());
+        assertEquals(view | insert | extract | Permission.COLLECT.bit(), MenuAccess.STORAGE.relevantPermissions());
         assertEquals(craft | view, MenuAccess.CRAFTING_REQUEST.relevantPermissions());
         assertEquals(craft | view, MenuAccess.STATUS.relevantPermissions());
         assertEquals(build | view, MenuAccess.HARDWARE.relevantPermissions());
@@ -28,6 +28,7 @@ class MenuAccessTest {
         assertFalse(MenuAccess.STORAGE.lostRelevant(all, all & ~Permission.BUILD.bit()));
         assertTrue(MenuAccess.STORAGE.lostRelevant(all, all & ~Permission.EXTRACT.bit()));
         assertTrue(MenuAccess.STORAGE.lostRelevant(all, all & ~Permission.INSERT.bit()));
+        assertTrue(MenuAccess.STORAGE.lostRelevant(all, all & ~Permission.COLLECT.bit()));
         assertTrue(MenuAccess.CRAFTING_REQUEST.lostRelevant(all, all & ~Permission.CRAFT.bit()));
         assertFalse(MenuAccess.CRAFTING_REQUEST.lostRelevant(all, all & ~Permission.EXTRACT.bit()));
         assertTrue(MenuAccess.HARDWARE.lostRelevant(all, all & ~Permission.BUILD.bit()));
