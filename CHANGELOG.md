@@ -9,6 +9,7 @@
 - Native hardware menus require Build; security and pattern management remain owner-only. Block/part menu actions validate live hosts and an eight-block range.
 - Protected network hardware survives explosions, including the entire Security Terminal cable-bus block.
 - External disk transfers are disabled in protected drives, ME Chests, ME IO Ports, and Spatial IO Ports, including handlers cached before terminal installation. Ordinary resource automation continues.
+- The Security Terminal screen is rebuilt from AE2's own terminal parts: AE2's frame and left toolbar, a scrollable player list with lock icons and per-player permission lights, AE2 toggle switches for permissions, and a network status badge. Its style follows resource packs that restyle AE2.
 
 ### Fixed
 

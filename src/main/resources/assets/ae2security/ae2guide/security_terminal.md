@@ -35,11 +35,13 @@ Right-click its face to manage access. Only its owner can open this screen.
 ## Trusting a player
 
 1. Search for a player who has joined the server, using their name or UUID.
-2. Select their row in the player list. The outline marks the player being edited,
-   and the access panel shows their name.
+2. Select their row in the player list. The highlighted row marks the player being
+   edited, and the access panel shows their name. An open lock marks trusted players,
+   and the lights under their name show which of the five permissions they hold. Scroll
+   the list, or drag its scrollbar, to see more players.
 3. Click **Trust player**. Trust allows viewing storage and crafting information.
-4. Enable any additional permissions using the buttons below their name. A
-   highlighted, pressed button means the permission is on.
+4. Enable any additional permissions with the switches below their name. A switch
+   pushed to the right, shown in blue, means the permission is on.
 
 New trusted players start with viewing access only. **Remove trust** revokes all
 their access. Reducing permissions closes that player's affected open ME screen;
