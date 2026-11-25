@@ -25,6 +25,7 @@ import net.minecraft.world.phys.Vec3;
 /** A channel-using AE2 terminal part whose policy identity stays on the part, never its dropped item. */
 public final class SecurityTerminalPart extends AbstractDisplayPart implements MenuProvider {
     private static final String TERMINAL_TAG = "ae2security:terminal";
+    private static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
 
     public static final net.minecraft.resources.ResourceLocation MODEL_OFF = MESecurity.id("part/security_terminal_off");
     public static final net.minecraft.resources.ResourceLocation MODEL_ON = MESecurity.id("part/security_terminal_on");
@@ -34,6 +35,8 @@ public final class SecurityTerminalPart extends AbstractDisplayPart implements M
 
     private UUID terminalId = UUID.randomUUID();
     private boolean awaitingInitialOwner = true;
+    /** Server tick in which this instance created its policy, or -1. Never saved. */
+    private long policyCreatedTick = -1;
 
     public SecurityTerminalPart(IPartItem<?> item) {
         super(item, true);
@@ -46,7 +49,11 @@ public final class SecurityTerminalPart extends AbstractDisplayPart implements M
     @Override
     public void addToWorld() {
         super.addToWorld();
-        if (!awaitingInitialOwner || isClientSide() || !(getLevel() instanceof ServerLevel level)) return;
+        if (isClientSide() || !(getLevel() instanceof ServerLevel level)) return;
+        if (!awaitingInitialOwner) {
+            recoverMissingPolicy(level);
+            return;
+        }
 
         var node = getGridNode();
         var ownerId = node == null ? null : node.getOwningPlayerProfileId();
@@ -54,10 +61,56 @@ public final class SecurityTerminalPart extends AbstractDisplayPart implements M
 
         var data = SecuritySavedData.get(level.getServer());
         data.create(terminalId, ownerId);
+        policyCreatedTick = level.getServer().getTickCount();
         var owner = level.getServer().getPlayerList().getPlayer(ownerId);
         if (owner != null) data.rememberPlayer(ownerId, owner.getGameProfile().getName());
         awaitingInitialOwner = false;
         getHost().markForSave();
+    }
+
+    /**
+     * The part is saved with its chunk, the policy with the world data, and the two are written at
+     * different times. A terminal loaded without a policy or a tombstone would otherwise deny everyone
+     * forever, including the only player allowed to remove it.
+     */
+    private void recoverMissingPolicy(ServerLevel level) {
+        var data = SecuritySavedData.get(level.getServer());
+        if (data.policy(terminalId) != null || data.retired(terminalId)) return;
+
+        var position = getBlockEntity().getBlockPos();
+        var dimension = level.dimension().location();
+        var node = getGridNode();
+        var ownerId = node == null ? null : node.getOwningPlayerProfileId();
+        if (ownerId == null) {
+            LOGGER.warn("ME Security Terminal {} at {} in {} has no saved policy and no recorded placer. "
+                    + "It stays locked until an administrator removes the block.", terminalId, position, dimension);
+            return;
+        }
+        data.create(terminalId, ownerId);
+        var owner = level.getServer().getPlayerList().getPlayer(ownerId);
+        if (owner != null) data.rememberPlayer(ownerId, owner.getGameProfile().getName());
+        LOGGER.warn("ME Security Terminal {} at {} in {} had no saved policy, so one was recreated for the player "
+                + "who placed it ({}). Trusted players and permissions were not recovered, and an ownership "
+                + "transfer made before the policy was lost has reverted to that placer.",
+                terminalId, position, dimension, ownerId);
+    }
+
+    /**
+     * AE2 rolls back an obstructed placement by removing the part it just added, without collecting
+     * drops, while the cable bus stays in the world. Retire the policy this instance created in the same
+     * server tick, or the grid keeps a terminal identity that no part carries. A chunk unload marks the
+     * host as out of the world first, and a reloaded instance never creates a policy here, so neither
+     * can retire anything.
+     */
+    @Override
+    public void removeFromWorld() {
+        if (policyCreatedTick >= 0 && getLevel() instanceof ServerLevel level
+                && level.getServer().getTickCount() == policyCreatedTick
+                && getHost() != null && getHost().isInWorld()) {
+            retirePolicy();
+        }
+        policyCreatedTick = -1;
+        super.removeFromWorld();
     }
 
     @Override

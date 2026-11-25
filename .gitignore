@@ -6,3 +6,5 @@ run*/
 *.iml
 .DS_Store
 logs/
+.claude-flow/
+.ruv-swarm/

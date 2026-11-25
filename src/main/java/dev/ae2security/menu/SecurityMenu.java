@@ -17,6 +17,13 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 /** No item slots: all access editing is validated against the live server block and policy revision. */
 public final class SecurityMenu extends AbstractContainerMenu {
+    /** Edits accepted back to back from one open screen; the screen sends one packet per click. */
+    public static final int EDIT_BURST = 40;
+    /** One further edit is allowed per interval: 20 a second, sustained. */
+    private static final long EDIT_REFILL_NANOS = 50_000_000L;
+
+    private int editBudget = EDIT_BURST;
+    private long editBudgetAt = System.nanoTime();
     private final Player player;
     private final BlockPos position;
     private final Direction side;
@@ -115,8 +122,26 @@ public final class SecurityMenu extends AbstractContainerMenu {
         PacketDistributor.sendToPlayer(player, new PolicyEditResult(containerId, edit.requestId(), result));
     }
 
+    /** Refills one edit per interval up to the burst. Never true for a person clicking, however fast. */
+    private boolean overEditBudget() {
+        long now = System.nanoTime();
+        long refill = (now - editBudgetAt) / EDIT_REFILL_NANOS;
+        if (refill > 0) {
+            editBudget = (int) Math.min(EDIT_BURST, editBudget + refill);
+            editBudgetAt = refill >= EDIT_BURST ? now : editBudgetAt + refill * EDIT_REFILL_NANOS;
+        }
+        if (editBudget <= 0) return true;
+        editBudget--;
+        return false;
+    }
+
     public void edit(Player actor, EditPolicy edit) {
         if (!(actor instanceof ServerPlayer serverPlayer) || actor != player || actor.containerMenu != this) return;
+        // Checked before any world or policy work, so a flood costs one small reply per packet.
+        if (overEditBudget()) {
+            acknowledge(serverPlayer, edit, PolicyEditResult.Result.REFRESH);
+            return;
+        }
         if (!stillValid(actor)) {
             acknowledge(serverPlayer, edit, PolicyEditResult.Result.DENIED);
             serverPlayer.closeContainer();
@@ -135,7 +160,7 @@ public final class SecurityMenu extends AbstractContainerMenu {
             broadcastChanges();
             return;
         }
-        if (edit.target().equals(policy.owner()) || !data.players().containsKey(edit.target()) && !policy.trusted().containsKey(edit.target())) {
+        if (edit.target().equals(policy.owner()) || !data.knows(edit.target()) && !policy.trusted().containsKey(edit.target())) {
             acknowledge(serverPlayer, edit, PolicyEditResult.Result.INVALID);
             return;
         }

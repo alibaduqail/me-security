@@ -10,6 +10,7 @@ import appeng.api.storage.MEStorage;
 import appeng.api.util.AEColor;
 import appeng.blockentity.networking.CableBusBlockEntity;
 import appeng.core.definitions.AEParts;
+import appeng.core.definitions.AEItems;
 import com.mojang.authlib.GameProfile;
 import dev.ae2security.MESecurity;
 import dev.ae2security.part.SecurityTerminalPart;
@@ -21,12 +22,15 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.neoforged.neoforge.common.util.FakePlayerFactory;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -439,6 +443,138 @@ public final class SecurityGameTests {
     }
 
     @GameTest(templateNamespace = "minecraft", template = "bastion/mobs/empty", timeoutTicks = 100)
+    public static void craftOnlyCollectsOwnCompletedOutput(GameTestHelper helper) {
+        var level = helper.getLevel();
+        var owner = FakePlayerFactory.get(level, new GameProfile(UUID.randomUUID(), "OutputOwner"));
+        var crafter = FakePlayerFactory.get(level, new GameProfile(UUID.randomUUID(), "OutputGuest"));
+        var other = FakePlayerFactory.get(level, new GameProfile(UUID.randomUUID(), "OtherCrafter"));
+        var position = helper.absolutePos(TERMINAL_POS);
+        placeCable(level, position, owner);
+        var terminal = PartHelper.setPart(level, position, Direction.NORTH, owner, MESecurity.TERMINAL_ITEM.get());
+        var storageTerminal = PartHelper.setPart(level, position, Direction.SOUTH, owner, AEParts.TERMINAL.get());
+        helper.setBlock(TERMINAL_POS.below(), appeng.core.definitions.AEBlocks.CREATIVE_ENERGY_CELL.block());
+        helper.setBlock(TERMINAL_POS.east(), appeng.core.definitions.AEBlocks.CRAFTING_STORAGE_1K.block());
+        helper.runAfterDelay(30, () -> {
+            var data = SecuritySavedData.get(level.getServer());
+            var id = terminal.terminalId();
+            data.update(id, data.policy(id).trust(owner.getUUID(), crafter.getUUID(), Permission.CRAFT.bit())
+                    .trust(owner.getUUID(), other.getUUID(), Permission.CRAFT.bit()));
+            var grid = terminal.getGridNode().getGrid();
+            var mounted = new TestStorage();
+            grid.getStorageService().addGlobalStorageProvider(mounts -> mounts.mount(mounted));
+            var network = grid.getStorageService().getInventory();
+            var source = IActionSource.ofPlayer(crafter);
+            var machine = IActionSource.ofMachine(terminal);
+            var diamond = AEItemKey.of(Items.DIAMOND);
+            var iron = AEItemKey.of(Items.IRON_INGOT);
+            network.insert(diamond, 20, Actionable.MODULATE, machine);
+            network.insert(iron, 20, Actionable.MODULATE, machine);
+            var cpu = ((appeng.blockentity.crafting.CraftingBlockEntity) level.getBlockEntity(position.east())).getCluster();
+            helper.assertTrue(cpu != null && cpu.isActive(), "crafting CPU must be active");
+            var plan = emittedPlan(diamond, 4);
+            helper.assertTrue(cpu.submitJob(grid, plan, source, null).successful(), "Craft alone submits a job");
+            helper.assertFalse(cpu.submitJob(grid, plan, IActionSource.ofPlayer(other), null).successful(),
+                    "failed submission cannot replace the original requesting player");
+            helper.assertValueEqual(0L, network.extract(diamond, 4, Actionable.MODULATE, source),
+                    "a pending job does not unlock existing stock");
+            // Standalone jobs pass their outputs onward to network storage rather than consuming them.
+            helper.assertValueEqual(0L, cpu.insert(diamond, 2, Actionable.SIMULATE, machine), "output simulation");
+            helper.assertValueEqual(0L, data.craftedAmount(id, crafter.getUUID(), diamond), "simulation grants nothing");
+            network.insert(diamond, 2, Actionable.MODULATE, machine);
+            helper.assertValueEqual(0L, data.craftedAmount(id, crafter.getUUID(), diamond), "partial job grants nothing");
+            var savedCpu = new net.minecraft.nbt.CompoundTag();
+            cpu.craftingLogic.writeToNBT(savedCpu, level.registryAccess());
+            cpu.craftingLogic.readFromNBT(savedCpu, level.registryAccess());
+            network.insert(diamond, 2, Actionable.MODULATE, machine);
+            helper.assertValueEqual(4L, data.craftedAmount(id, crafter.getUUID(), diamond),
+                    "completed job retains its requesting UUID through CPU reload");
+            var restored = SecuritySavedData.load(data.save(new net.minecraft.nbt.CompoundTag(), level.registryAccess()),
+                    level.registryAccess());
+            helper.assertValueEqual(4L, restored.craftedAmount(id, crafter.getUUID(), diamond), "allowance survives world save");
+            helper.assertValueEqual(0L, network.extract(diamond, 4, Actionable.MODULATE, IActionSource.ofPlayer(other)),
+                    "another crafter cannot collect this player's output");
+            helper.assertValueEqual(0L, network.extract(iron, 4, Actionable.MODULATE, source), "other stock stays protected");
+            helper.assertValueEqual(4L, network.extract(diamond, 64, Actionable.SIMULATE, source), "simulation is quantity limited");
+            helper.assertValueEqual(4L, data.craftedAmount(id, crafter.getUUID(), diamond), "simulation spends nothing");
+            var menuStorage = new PlayerMenuStorage(storageTerminal.getInventory(), storageTerminal, crafter);
+            helper.assertValueEqual(1L, menuStorage.extract(diamond, 1, Actionable.MODULATE, source), "partial menu collection");
+            helper.assertValueEqual(3L, data.craftedAmount(id, crafter.getUUID(), diamond), "menu collection spends once");
+            crafter.setPos(Vec3.atCenterOf(position));
+            var menu = new appeng.menu.me.common.MEStorageMenu(appeng.menu.me.common.MEStorageMenu.TYPE,
+                    3, crafter.getInventory(), storageTerminal);
+            menu.setLinkStatus(storageTerminal.getLinkStatus());
+            crafter.containerMenu = menu;
+            try {
+                var interaction = appeng.menu.me.common.MEStorageMenu.class.getDeclaredMethod("handleNetworkInteraction",
+                        net.minecraft.server.level.ServerPlayer.class, AEKey.class, appeng.helpers.InventoryAction.class);
+                interaction.setAccessible(true);
+                interaction.invoke(menu, crafter, diamond, appeng.helpers.InventoryAction.PICKUP_OR_SET_DOWN);
+            } catch (ReflectiveOperationException e) {
+                throw new AssertionError("Could not exercise terminal output pickup", e);
+            }
+            helper.assertValueEqual(3, menu.getCarried().getCount(), "terminal pickup caps the remaining output");
+            helper.assertValueEqual(0L, data.craftedAmount(id, crafter.getUUID(), diamond), "terminal pickup spends the remainder");
+            helper.assertValueEqual(0L, network.extract(diamond, 1, Actionable.MODULATE, source), "allowance cannot be reused");
+
+            helper.assertTrue(cpu.submitJob(grid, plan, source, null).successful(), "second job submits");
+            cpu.insert(diamond, 2, Actionable.MODULATE, machine);
+            cpu.cancelJob();
+            helper.assertValueEqual(0L, data.craftedAmount(id, crafter.getUUID(), diamond), "canceled partial job grants nothing");
+            helper.assertTrue(cpu.submitJob(grid, plan, machine, null).successful(), "machine job submits");
+            cpu.insert(diamond, 4, Actionable.MODULATE, machine);
+            helper.assertValueEqual(0L, data.craftedAmount(id, crafter.getUUID(), diamond), "machine job grants no player allowance");
+
+            var requester = new appeng.api.networking.crafting.ICraftingRequester() {
+                @Override public appeng.api.networking.IGridNode getActionableNode() { return terminal.getActionableNode(); }
+                @Override public com.google.common.collect.ImmutableSet<appeng.api.networking.crafting.ICraftingLink> getRequestedJobs() {
+                    return com.google.common.collect.ImmutableSet.of();
+                }
+                @Override public long insertCraftedItems(appeng.api.networking.crafting.ICraftingLink link, AEKey key,
+                        long amount, Actionable mode) { return amount; }
+                @Override public void jobStateChange(appeng.api.networking.crafting.ICraftingLink link) {}
+            };
+            helper.assertTrue(cpu.submitJob(grid, plan, source, requester).successful(), "linked requester job submits");
+            network.insert(diamond, 4, Actionable.MODULATE, machine);
+            helper.assertValueEqual(0L, data.craftedAmount(id, crafter.getUUID(), diamond),
+                    "outputs delivered to a requester must not also grant terminal collection");
+
+            helper.assertTrue(cpu.submitJob(grid, plan, source, null).successful(), "third player job submits");
+            cpu.insert(diamond, 4, Actionable.MODULATE, machine);
+            data.update(id, data.policy(id).trust(owner.getUUID(), crafter.getUUID(), 0));
+            helper.assertValueEqual(0L, network.extract(diamond, 4, Actionable.MODULATE, source), "revoked Craft denies collection");
+            data.update(id, data.policy(id).trust(owner.getUUID(), crafter.getUUID(), Permission.EXTRACT.bit()));
+            helper.assertValueEqual(4L, network.extract(diamond, 4, Actionable.MODULATE, source), "full Extract still works");
+            data.update(id, data.policy(id).trust(owner.getUUID(), crafter.getUUID(), Permission.CRAFT.bit()));
+            helper.assertValueEqual(0L, network.extract(diamond, 1, Actionable.MODULATE, source),
+                    "collection with full Extract also consumes the allowance");
+
+            var water = AEFluidKey.of(Fluids.WATER);
+            helper.assertTrue(cpu.submitJob(grid, emittedPlan(water, 500), source, null).successful(), "fluid job submits");
+            network.insert(water, 1000, Actionable.MODULATE, machine);
+            helper.assertValueEqual(500L, menuStorage.extract(water, 1000, Actionable.MODULATE, source),
+                    "fluid output collection caps the requested quantity");
+            helper.assertValueEqual(0L, network.extract(water, 1, Actionable.MODULATE, source), "extra fluid stock stays protected");
+            helper.destroyBlock(TERMINAL_POS.east());
+            helper.destroyBlock(TERMINAL_POS.below());
+            helper.destroyBlock(TERMINAL_POS);
+            helper.succeed();
+        });
+    }
+
+    private static appeng.api.networking.crafting.ICraftingPlan emittedPlan(AEKey key, long amount) {
+        return new appeng.api.networking.crafting.ICraftingPlan() {
+            @Override public GenericStack finalOutput() { return new GenericStack(key, amount); }
+            @Override public long bytes() { return 1; }
+            @Override public boolean simulation() { return false; }
+            @Override public boolean multiplePaths() { return false; }
+            @Override public KeyCounter usedItems() { return new KeyCounter(); }
+            @Override public KeyCounter emittedItems() { var keys = new KeyCounter(); keys.add(key, amount); return keys; }
+            @Override public KeyCounter missingItems() { return new KeyCounter(); }
+            @Override public Map<appeng.api.crafting.IPatternDetails, Long> patternTimes() { return Map.of(); }
+        };
+    }
+
+    @GameTest(templateNamespace = "minecraft", template = "bastion/mobs/empty", timeoutTicks = 100)
     public static void craftingContextIsGridBound(GameTestHelper helper) {
         var level = helper.getLevel();
         var owner = FakePlayerFactory.get(level, new GameProfile(UUID.randomUUID(), "CraftOwner"));
@@ -455,6 +591,24 @@ public final class SecurityGameTests {
             var other = second.getGridNode().getGrid();
             var normal = IActionSource.ofPlayer(crafter);
             var internal = CraftingActionSource.approved(normal, grid);
+            var diamond = AEItemKey.of(Items.DIAMOND);
+            data.recordCraftedOutput(first.terminalId(), crafter.getUUID(), new GenericStack(diamond, 3));
+            helper.assertValueEqual(3L, SecurityAccess.extractionLimit(grid, normal, diamond, 64), "allowance caps local collection");
+            helper.assertValueEqual(0L, SecurityAccess.extractionLimit(other, normal, diamond, 64), "allowance cannot cross grids");
+            var cell = new TestStorage();
+            var cellMenu = new PlayerMenuStorage(cell, first, crafter);
+            helper.assertValueEqual(0L, cellMenu.extract(diamond, 3, Actionable.MODULATE, normal), "empty cell extracts nothing");
+            helper.assertValueEqual(3L, data.craftedAmount(first.terminalId(), crafter.getUUID(), diamond),
+                    "failed collection spends nothing");
+            cell.insert(diamond, 1, Actionable.MODULATE, IActionSource.ofMachine(first));
+            helper.assertValueEqual(1L, cellMenu.extract(diamond, 3, Actionable.MODULATE, IActionSource.ofMachine(first)),
+                    "direct cell menu extraction uses its player's allowance");
+            helper.assertValueEqual(2L, data.craftedAmount(first.terminalId(), crafter.getUUID(), diamond),
+                    "direct cell collection spends only the amount actually extracted");
+            var namedDiamond = new ItemStack(Items.DIAMOND);
+            namedDiamond.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, Component.literal("Other product"));
+            helper.assertValueEqual(0L, SecurityAccess.extractionLimit(grid, normal, AEItemKey.of(namedDiamond), 1),
+                    "allowance matches exact item components");
             helper.assertFalse(SecurityAccess.transfer(grid, normal, Permission.EXTRACT), "Craft is not general extraction");
             helper.assertTrue(SecurityAccess.transfer(grid, internal, Permission.EXTRACT), "approved initial ingredients may transfer");
             helper.assertFalse(SecurityAccess.transfer(other, internal, Permission.EXTRACT), "internal authorization must not cross grids");
@@ -464,6 +618,8 @@ public final class SecurityGameTests {
                     "ongoing machine automation remains independent of player revocation");
             helper.destroyBlock(TERMINAL_POS.above());
             helper.destroyBlock(TERMINAL_POS);
+            helper.assertValueEqual(0L, data.craftedAmount(first.terminalId(), crafter.getUUID(), diamond),
+                    "terminal retirement clears uncollected allowances");
             helper.succeed();
         });
     }

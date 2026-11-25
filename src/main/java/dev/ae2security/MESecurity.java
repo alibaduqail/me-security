@@ -3,6 +3,7 @@ package dev.ae2security;
 import appeng.api.networking.GridServices;
 import appeng.api.parts.PartModels;
 import dev.ae2security.gametest.SecurityGameTests;
+import dev.ae2security.gametest.HardwareGameTests;
 import dev.ae2security.menu.SecurityMenu;
 import dev.ae2security.network.SecurityPayloads;
 import dev.ae2security.part.SecurityTerminalItem;
@@ -21,6 +22,7 @@ import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
+import net.neoforged.neoforge.event.level.ExplosionEvent;
 import net.neoforged.neoforge.registries.*;
 
 @Mod(MESecurity.ID)
@@ -40,7 +42,9 @@ public final class MESecurity {
             CREATIVE_TABS.register("main", () -> CreativeModeTab.builder()
                     .title(Component.translatable("itemGroup.ae2security"))
                     .icon(() -> TERMINAL_ITEM.get().getDefaultInstance())
-                    .displayItems((parameters, output) -> output.accept(TERMINAL_ITEM.get()))
+                    .displayItems((parameters, output) -> {
+                        output.accept(TERMINAL_ITEM.get());
+                    })
                     .build());
 
     public MESecurity(IEventBus bus) {
@@ -53,23 +57,35 @@ public final class MESecurity {
         bus.addListener(this::gameTests);
         NeoForge.EVENT_BUS.addListener(this::login);
         NeoForge.EVENT_BUS.addListener(this::blockBreak);
+        NeoForge.EVENT_BUS.addListener(this::protectHardwareFromExplosions);
+        NeoForge.EVENT_BUS.addListener(SecurityWorldEvents::livingDestroy);
+        NeoForge.EVENT_BUS.addListener(net.neoforged.bus.api.EventPriority.HIGHEST, SecurityHardware::toolUse);
     }
 
     public static ResourceLocation id(String path) { return ResourceLocation.fromNamespaceAndPath(ID, path); }
     private void setup(FMLCommonSetupEvent event) {
-        event.enqueueWork(() -> GridServices.register(ISecurityGrid.class, SecurityGridService.class));
+        event.enqueueWork(() -> {
+            GridServices.register(ISecurityGrid.class, SecurityGridService.class);
+            SecurityWorldEvents.registerGridEvents();
+        });
     }
-    private void gameTests(RegisterGameTestsEvent event) { event.register(SecurityGameTests.class); }
+    private void gameTests(RegisterGameTestsEvent event) {
+        event.register(SecurityGameTests.class);
+        event.register(HardwareGameTests.class);
+    }
     private void login(PlayerEvent.PlayerLoggedInEvent event) {
         var player = event.getEntity();
         if (player.getServer() != null) SecuritySavedData.get(player.getServer()).rememberPlayer(player.getUUID(), player.getGameProfile().getName());
     }
     private void blockBreak(BlockEvent.BreakEvent event) {
-        if (event.getPlayer() == null) return;
-        var blockEntity = event.getLevel().getBlockEntity(event.getPos());
-        if (blockEntity instanceof appeng.blockentity.networking.CableBusBlockEntity cableBus
-                && !SecurityBreak.allowBlockBreak(cableBus, event.getPlayer())) {
+        if (event.getPlayer() != null
+                && !SecurityBreak.allowBlockBreak(event.getLevel().getBlockEntity(event.getPos()), event.getPlayer())) {
             event.setCanceled(true);
         }
+    }
+
+    private void protectHardwareFromExplosions(ExplosionEvent.Detonate event) {
+        // Resolve all membership before the explosion can destroy nodes or split a grid.
+        event.getAffectedBlocks().removeIf(pos -> SecurityHardware.protectedBlock(event.getLevel(), pos));
     }
 }

@@ -1,7 +1,6 @@
 package dev.ae2security.client;
 
 import java.util.EnumMap;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -22,7 +21,6 @@ import dev.ae2security.menu.SecurityMenu;
 import dev.ae2security.network.EditPolicy;
 import dev.ae2security.network.PolicySnapshot;
 import dev.ae2security.network.PolicyEditResult;
-import dev.ae2security.network.PlayerSearchRequest;
 import dev.ae2security.network.PlayerSearchResult;
 import dev.ae2security.security.OwnershipConfirmation;
 import dev.ae2security.security.Permission;
@@ -65,41 +63,18 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
     private AE2Button nextPageButton;
     private AE2Button trustButton;
     private AE2Button transferButton;
-    private List<PolicySnapshot.PlayerEntry> visiblePlayers = List.of();
 
-    private String query = "";
-    private int page;
-    private UUID selected;
+    private final PlayerListState players = new PlayerListState();
+    private final PendingEdits edits = new PendingEdits();
     private UUID transferConfirmation;
     private String transferInput = "";
     private PolicySnapshot displayed;
-    private boolean pending;
-    private int pendingRequestId = -1;
-    private int nextRequestId;
-    private PolicyEditResult processedEditResult;
-    private PolicyEditResult.Result editStatus;
-    private PlayerSearchResult processedSearchResult;
-    private int searchSequence;
-    private int searchDelay = -1;
-    private boolean searchPending;
-    private int totalPlayers;
 
     public SecurityScreen(SecurityMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
         this.style = StyleManager.loadStyleDoc("/screens/terminals/base_terminal.json");
         imageWidth = 304;
         imageHeight = 218;
-    }
-
-    private List<PolicySnapshot.PlayerEntry> filtered() {
-        return visiblePlayers;
-    }
-
-    private PolicySnapshot.PlayerEntry selection() {
-        return visiblePlayers.stream()
-                .filter(player -> player.id().equals(selected))
-                .findFirst()
-                .orElse(null);
     }
 
     @Override
@@ -124,13 +99,10 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         search.setPlaceholder(Component.translatable("screen.ae2security.search"));
         search.setMessage(Component.translatable("screen.ae2security.search"));
         search.setTooltip(Tooltip.create(Component.translatable("screen.ae2security.search_tooltip")));
-        search.setValue(query);
+        search.setValue(players.query());
         search.setResponder(value -> {
-            query = value;
-            page = 0;
-            selected = null;
+            players.setQuery(value);
             clearTransferConfirmation();
-            scheduleSearch(4, true);
             refreshControls();
         });
 
@@ -141,20 +113,8 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
                     button -> selectVisiblePlayer(rowIndex)));
         }
 
-        previousPageButton = ae2Button(12, 186, 34, 18, Component.literal("<"), () -> {
-            page--;
-            selected = null;
-            clearTransferConfirmation();
-            scheduleSearch(0, true);
-            refreshControls();
-        });
-        nextPageButton = ae2Button(118, 186, 34, 18, Component.literal(">"), () -> {
-            page++;
-            selected = null;
-            clearTransferConfirmation();
-            scheduleSearch(0, true);
-            refreshControls();
-        });
+        previousPageButton = ae2Button(12, 186, 34, 18, Component.literal("<"), () -> turnPage(-1));
+        nextPageButton = ae2Button(118, 186, 34, 18, Component.literal(">"), () -> turnPage(1));
 
         for (int row = 0; row < Permission.editable().size(); row++) {
             var permission = Permission.editable().get(row);
@@ -182,7 +142,7 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         transferButton.setTooltip(Tooltip.create(Component.translatable("screen.ae2security.transfer_warning")));
 
         displayed = menu.snapshot();
-        if (displayed != null) scheduleSearch(0, true);
+        if (displayed != null) players.refresh(true);
         refreshControls();
         setInitialFocus(search);
     }
@@ -202,33 +162,33 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         };
     }
 
+    private void turnPage(int delta) {
+        players.turnPage(delta);
+        clearTransferConfirmation();
+        refreshControls();
+    }
+
     private void selectVisiblePlayer(int row) {
-        if (row >= visiblePlayers.size()) {
+        if (!players.select(row)) {
             return;
         }
-        selected = visiblePlayers.get(row).id();
         clearTransferConfirmation();
         refreshControls();
     }
 
     private void togglePermission(Permission permission) {
-        var player = selection();
-        if (player == null) {
-            return;
-        }
-
         send(EditPolicy.Action.TOGGLE_PERMISSION, permission.bit());
     }
 
     private void toggleTrust() {
-        var player = selection();
+        var player = players.selection();
         if (player != null) {
             send(player.trusted() ? EditPolicy.Action.REMOVE : EditPolicy.Action.TRUST, Permission.VIEW.bit());
         }
     }
 
     private void transferOwnership() {
-        var player = selection();
+        var player = players.selection();
         if (player == null) {
             return;
         }
@@ -255,12 +215,10 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
             return;
         }
 
-        int lastPage = Math.max(0, (totalPlayers - 1) / PAGE_SIZE);
-        if (!searchPending && page > lastPage) {
-            page = lastPage;
-            scheduleSearch(0, true);
-        }
-
+        boolean pending = edits.pending();
+        boolean searchPending = players.searching();
+        var visiblePlayers = players.players();
+        var player = players.selection();
         for (int row = 0; row < PAGE_SIZE; row++) {
             var button = playerButtons[row];
             if (row >= visiblePlayers.size()) {
@@ -269,19 +227,18 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
                 continue;
             }
 
-            var player = visiblePlayers.get(row);
-            String marker = player.trusted() ? "+ " : "  ";
-            button.setMessage(Component.literal(marker + font.plainSubstrByWidth(player.name(), 116)));
-            button.setTooltip(Tooltip.create(SecurityScreenText.playerTooltip(player)));
-            button.setSelected(player.id().equals(selected));
+            var listed = visiblePlayers.get(row);
+            String marker = listed.trusted() ? "+ " : "  ";
+            button.setMessage(Component.literal(marker + font.plainSubstrByWidth(listed.name(), 116)));
+            button.setTooltip(Tooltip.create(SecurityScreenText.playerTooltip(listed)));
+            button.setSelected(player != null && listed.id().equals(player.id()));
             button.visible = true;
             button.active = true;
         }
 
-        previousPageButton.active = !searchPending && page > 0;
-        nextPageButton.active = !searchPending && page < lastPage;
+        previousPageButton.active = !searchPending && players.page() > 0;
+        nextPageButton.active = !searchPending && players.page() < players.lastPage();
 
-        var player = selection();
         boolean trusted = player != null && player.trusted();
         for (var permission : Permission.editable()) {
             boolean enabled = player != null && permission.in(player.permissions());
@@ -291,7 +248,7 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
             var description = Component.translatable(permissionKey + ".description");
             button.setSelected(enabled);
             button.visible = trusted;
-            button.active = trusted && !searchPending;
+            button.active = trusted && !pending && !searchPending;
             button.setTooltip(Tooltip.create(Component.empty()
                     .append(Component.translatable(
                             enabled ? "screen.ae2security.permission_enabled"
@@ -324,19 +281,20 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
 
     private void send(EditPolicy.Action action, int mask, String confirmation) {
         var snapshot = menu.snapshot();
-        boolean toggle = action == EditPolicy.Action.TOGGLE_PERMISSION;
-        if (snapshot == null || selected == null || pending && !toggle) {
+        var player = players.selection();
+        if (snapshot == null || player == null) {
             return;
         }
 
-        int requestId = ++nextRequestId;
-        if (!toggle) {
-            pending = true;
-            pendingRequestId = requestId;
+        // Only permission toggles may overlap each other. Nothing is sent while a trust,
+        // removal or transfer is unacknowledged: the menu keeps one result, so a second
+        // acknowledgement could replace the one this screen is waiting for.
+        int requestId = edits.begin(action != EditPolicy.Action.TOGGLE_PERMISSION);
+        if (requestId == PendingEdits.BLOCKED) {
+            return;
         }
-        editStatus = null;
-        PacketDistributor.sendToServer(new EditPolicy(menu.containerId, requestId, snapshot.revision(), selected, action, mask,
-                confirmation));
+        PacketDistributor.sendToServer(new EditPolicy(menu.containerId, requestId, snapshot.revision(), player.id(),
+                action, mask, confirmation));
         refreshControls();
     }
 
@@ -346,16 +304,6 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         if (transferName != null) transferName.setValue("");
         if (transferName != null) transferName.setFocused(false);
         if (getFocused() == transferName) setFocused(null);
-    }
-
-    private void scheduleSearch(int delay, boolean clearRows) {
-        searchSequence++;
-        searchDelay = delay;
-        searchPending = true;
-        if (clearRows) {
-            visiblePlayers = List.of();
-            totalPlayers = 0;
-        }
     }
 
     @Override
@@ -369,46 +317,21 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
             if (displayed != null && (old == null
                     || old.revision() != displayed.revision()
                     || old.directoryRevision() != displayed.directoryRevision()))
-                scheduleSearch(0, false);
+                players.refresh(false);
             refreshControls();
         }
-        var editResult = menu.editResult();
-        if (editResult != null && editResult != processedEditResult) {
-            processedEditResult = editResult;
-            if (editResult.requestId() == pendingRequestId) {
-                pendingRequestId = -1;
-                pending = false;
-                editStatus = editResult.result();
-            }
+        var edit = edits.accept(menu.editResult());
+        if (edit != PendingEdits.Outcome.IGNORED) {
+            // A lost acknowledgement leaves the outcome unknown, so reload what the server holds.
+            if (edit == PendingEdits.Outcome.SUPERSEDED) players.refresh(false);
             refreshControls();
         }
-        if (searchDelay >= 0 && menu.snapshot() != null && --searchDelay < 0) {
-            PacketDistributor.sendToServer(new PlayerSearchRequest(menu.containerId,
-                    searchSequence, query, page));
-        }
-        var result = menu.searchResult();
-        if (result != null && result != processedSearchResult) {
-            processedSearchResult = result;
-            if (result.sequence() == searchSequence) {
-                if (result.busy()) {
-                    searchDelay = 3;
-                } else {
-                    var previousSelection = selection();
-                    searchPending = false;
-                    page = result.page();
-                    totalPlayers = result.total();
-                    visiblePlayers = result.players();
-                    var currentSelection = selection();
-                    if (currentSelection == null) {
-                        selected = null;
-                        clearTransferConfirmation();
-                    } else if (previousSelection != null && (!currentSelection.trusted()
-                            || !previousSelection.name().equals(currentSelection.name()))) {
-                        clearTransferConfirmation();
-                    }
-                    refreshControls();
-                }
-            }
+        var request = menu.snapshot() == null ? null : players.poll(menu.containerId);
+        if (request != null) PacketDistributor.sendToServer(request);
+        var update = players.accept(menu.searchResult());
+        if (update != PlayerListState.Update.IGNORED) {
+            if (update == PlayerListState.Update.SELECTION_STALE) clearTransferConfirmation();
+            refreshControls();
         }
     }
 
@@ -469,7 +392,7 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
 
         graphics.drawString(font, Component.translatable("screen.ae2security.players"), 12, 43, AE2_DARK, false);
 
-        var selectedPlayer = selection();
+        var selectedPlayer = players.selection();
         String accessHeading = selectedPlayer == null
                 ? Component.translatable("screen.ae2security.select").getString()
                 : Component.translatable("screen.ae2security.access_for", selectedPlayer.name()).getString();
@@ -493,14 +416,15 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
                     AE2_MUTED_TEXT, false);
         }
 
-        var rows = filtered();
-        String pages = (page + 1) + " / " + Math.max(1, (totalPlayers + PAGE_SIZE - 1) / PAGE_SIZE);
+        String pages = (players.page() + 1) + " / " + (players.lastPage() + 1);
         graphics.drawCenteredString(font, pages, 82, 191, AE2_DARK);
-        if (rows.isEmpty()) {
-            graphics.drawCenteredString(font, Component.translatable(searchPending
+        if (players.players().isEmpty()) {
+            graphics.drawCenteredString(font, Component.translatable(players.searching()
                     ? "screen.ae2security.searching" : "screen.ae2security.no_players"), 82, 98,
                     AE2_MUTED_TEXT);
         }
+        boolean pending = edits.pending();
+        var editStatus = edits.status();
         if (pending || editStatus != null && transferConfirmation == null) {
             var status = Component.translatable(pending ? "screen.ae2security.pending"
                     : "screen.ae2security.edit_result." + editStatus.name().toLowerCase(Locale.ROOT));

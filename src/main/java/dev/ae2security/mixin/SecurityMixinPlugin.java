@@ -20,7 +20,7 @@ public final class SecurityMixinPlugin implements IMixinConfigPlugin {
     public List<String> getMixins() {
         return SecurityMixinPlugin.class.getClassLoader().getResource(AE2WTLIB_MAGNET) == null
                 ? List.of()
-                : List.of("AE2wtlibMagnetHandlerMixin");
+                : List.of("AE2wtlibMagnetHandlerMixin", "AE2wtlibCraftingTerminalHandlerMixin");
     }
 
     @Override public void preApply(String targetClassName, ClassNode targetClass, String mixinClassName,
