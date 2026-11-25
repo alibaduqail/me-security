@@ -44,7 +44,7 @@ Only one Security Terminal may be attached to a connected grid. Normal player pl
 
 Wireless terminals still require normal AE2 access-point pairing and range or quantum-link conditions. A paired item does not grant ME Security permissions.
 
-Only its owner can dismantle a Security Terminal or break the cable-bus block containing it, regardless of Build permission. Removing it retires its policy and drops a fresh, unbound part item. Policy identities and conservative topology associations survive chunk unloads and server restarts without chunk loading. Power loss and channel exhaustion do not turn protection off.
+Only its owner can dismantle a Security Terminal or break the cable-bus block containing it, regardless of Build permission (operators can use the recovery commands under Administration). Removing it retires its policy and drops a fresh, unbound part item. Policy identities and conservative topology associations survive chunk unloads and server restarts without chunk loading. Power loss and channel exhaustion do not turn protection off.
 
 ### Hardware protection
 
@@ -56,10 +56,24 @@ Protected hardware survives explosions. Storage cells in drives, ME Chests, ME I
 
 The unreleased Secure Drive and PIN system have been removed outright. This candidate does not migrate Secure Drive blocks or items from development worlds.
 
+## Administration
+
+Operators (permission level 2 or higher) can recover networks whose owner is gone with `/mesecurity`. Terminal UUIDs are shown by `info` and can be copied by clicking them in chat.
+
+| Command | Effect |
+|---|---|
+| `/mesecurity info` | Shows the terminal of the network you are looking at: its UUID, owner, trusted players with their permissions, and a conflict or unresolved warning. |
+| `/mesecurity info <terminal UUID>` | The same for a terminal by UUID. Works from the server console. |
+| `/mesecurity setowner <terminal UUID> <player>` | Makes an online or previously seen player (matched by name, ignoring case) the owner. Trusted entries remain and the previous owner loses access, like an in-game transfer. |
+| `/mesecurity retire <terminal UUID>` | Ends the terminal's policy. The network becomes unprotected and the leftover part is ordinary hardware. Use it on a terminal reported as unresolved. |
+| `/mesecurity bypass` | Toggles an admin bypass for yourself. While on, every ME Security check passes for you and you can remove any Security Terminal. It does not open the owner screen (use `setowner` for that), is kept in memory only, and ends on logout or server stop. Each toggle is logged. |
+
+A terminal placed with no owning player, such as by an automated placer that has no player profile, is retired immediately and protects nothing instead of locking its network.
+
 ## Scope and limitations
 
 ME Security controls player access through supported AE2 and AE2 Wireless Terminals menus, network storage transactions, crafting requests, crafting controls, and wireless restock inventory synchronization. Machine automation has no player principal and continues normally. Jobs already accepted by a crafting CPU continue after the initiating player's access changes.
 
-Hardware protection applies to native AE2 network devices and follows actual network connections, including conservative protection during unresolved topology. It does not protect arbitrary third-party movers or tools, administrative commands, external inventories, or machine outputs. The mod does not provide land claims, access history, or lockdown controls.
+Hardware protection applies to native AE2 network devices and follows actual network connections, including conservative protection during unresolved topology. It does not protect arbitrary third-party movers or tools, vanilla and third-party world-editing commands such as `/setblock` or WorldEdit, external inventories, or machine outputs. The only administrative commands the mod provides are the `/mesecurity` recovery commands below; it does not provide land claims, access history, or lockdown controls.
 
 Compatibility is limited to the exact versions in the table. Adding another terminal mod or changing an existing menu or packet path requires an explicit integration review; unknown integrations are not claimed to be protected.

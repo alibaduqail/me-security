@@ -59,6 +59,7 @@ public final class MESecurity {
         NeoForge.EVENT_BUS.addListener(this::blockBreak);
         NeoForge.EVENT_BUS.addListener(this::protectHardwareFromExplosions);
         NeoForge.EVENT_BUS.addListener(SecurityWorldEvents::livingDestroy);
+        SecurityCommands.register(NeoForge.EVENT_BUS);
         NeoForge.EVENT_BUS.addListener(net.neoforged.bus.api.EventPriority.HIGHEST, SecurityHardware::toolUse);
     }
 
