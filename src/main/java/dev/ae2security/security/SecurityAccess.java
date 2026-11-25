@@ -271,7 +271,8 @@ public final class SecurityAccess {
                 var grid = grid(menu.getTarget());
                 if (grid != null && grid.getService(ISecurityGrid.class).terminalIds().contains(terminal)) {
                     var type = BuiltInRegistries.MENU.getKey(menu.getType());
-                    boolean lostPermission = (before.permissions(player.getUUID()) & ~after.permissions(player.getUUID())) != 0;
+                    boolean lostPermission = MenuAccess.of(type).lostRelevant(before.permissions(player.getUUID()),
+                            after.permissions(player.getUUID()));
                     if (lostPermission || !opening(player, menu.getTarget(), type)) player.closeContainer();
                 }
             }
