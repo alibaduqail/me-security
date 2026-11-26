@@ -1,8 +1,10 @@
 package dev.ae2security.client;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.function.ToIntFunction;
 
+import dev.ae2security.network.PolicyEditResult;
 import dev.ae2security.network.PolicySnapshot;
 import net.minecraft.network.chat.Component;
 
@@ -33,5 +35,11 @@ final class SecurityScreenText {
             if (width.applyAsInt(candidate) <= maxWidth) return candidate;
         }
         return candidates.get(candidates.size() - 1);
+    }
+
+    /** The access panel's message for an edit result: failures only, as a saved change needs no note. */
+    static String editFailureKey(PolicyEditResult.Result result) {
+        if (result == null || result == PolicyEditResult.Result.APPLIED) return null;
+        return "screen.ae2security.edit_result." + result.name().toLowerCase(Locale.ROOT);
     }
 }

@@ -4,11 +4,13 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.UUID;
 
+import dev.ae2security.network.PolicyEditResult;
 import dev.ae2security.network.PolicySnapshot;
 import net.minecraft.network.chat.contents.TranslatableContents;
 import org.junit.jupiter.api.Test;
@@ -49,5 +51,18 @@ class SecurityScreenTextTest {
         assertEquals("Alex_Builder", SecurityScreenText.firstThatFits(forms, 12, width));
         assertEquals("Alex_Builder", SecurityScreenText.firstThatFits(forms, 3, width),
                 "the last form is kept, for the caller to clip, when nothing fits");
+    }
+
+    @Test
+    void onlyFailedEditsGetAStatusLine() {
+        assertNull(SecurityScreenText.editFailureKey(null));
+        assertNull(SecurityScreenText.editFailureKey(PolicyEditResult.Result.APPLIED),
+                "a saved change shows in the switches, not as a \"Changes saved\" note");
+        assertEquals("screen.ae2security.edit_result.refresh",
+                SecurityScreenText.editFailureKey(PolicyEditResult.Result.REFRESH));
+        assertEquals("screen.ae2security.edit_result.denied",
+                SecurityScreenText.editFailureKey(PolicyEditResult.Result.DENIED));
+        assertEquals("screen.ae2security.edit_result.invalid",
+                SecurityScreenText.editFailureKey(PolicyEditResult.Result.INVALID));
     }
 }
