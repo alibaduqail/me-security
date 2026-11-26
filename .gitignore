@@ -8,3 +8,12 @@ run*/
 logs/
 .claude-flow/
 .ruv-swarm/
+.swarm/
+
+# Local-only material (not part of the mod source)
+/.claude/
+/docs/
+/tools/
+/assets/
+/promo/
+/MODRINTH.md
