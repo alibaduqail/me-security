@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.2.2 - 2026-11-26
+
+### Fixed
+
+- The Security Terminal screen no longer flickers when you click Trust player, Remove trust or a permission switch. The controls used to grey out for a moment on every click while the change was saved.
+- Permission switches no longer stay highlighted after you click them and move the mouse away.
+
+### Changed
+
+- Removed the "Changes saved" note under the trust button; a saved change already shows in the switches and the player list. A note still appears when a change fails.
+- NeoForge and GuideME are no longer pinned to exact versions: any NeoForge 21.1.250 or newer 21.1.x and GuideME 21.1.1 or newer are accepted. AE2 and AE2 Wireless Terminals stay exact.
+
+### Compatibility
+
+- Minecraft 1.21.1, NeoForge 21.1.250 or newer, Applied Energistics 2 19.2.20, GuideME 21.1.1 or newer, optional AE2 Wireless Terminals 19.5.1.
+- No save or protocol changes from 1.2.1. Payload protocol stays at 6, so 1.2.0, 1.2.1 and 1.2.2 clients and servers can connect to each other as long as they use the same AE2 version.
+
 ## 1.2.1 - 2026-11-26
 
 ### Changed
