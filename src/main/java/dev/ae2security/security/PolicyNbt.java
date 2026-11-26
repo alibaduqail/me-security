@@ -29,8 +29,8 @@ public final class PolicyNbt {
     }
 
     /**
-     * @param craftImpliesCollect true for data written before Collect existed (saved-data format 3 or older):
-     *        collecting crafted output used to be part of Craft, so those entries keep that behavior
+     * @param craftImpliesCollect true for development data (saved-data formats 2 and 3) in which collecting
+     *        crafted output was part of Craft, so those entries keep that behavior
      */
     public static SecurityPolicy read(CompoundTag tag, boolean craftImpliesCollect) {
         if (!tag.hasUUID("owner")) throw new IllegalArgumentException("Security policy has no owner");

@@ -1,54 +1,46 @@
 # Changelog
 
-## 1.1.0-dev.2 — unreleased development candidate
+## 1.2.0 - 2026-11-26
 
-### Changed
-
-- Build now protects native AE2 network hardware: placement, mining, wrench removal, rotation, configuration, storage-cell management, and crafting-unit upgrades.
-- Placement and connection changes check affected native multiblocks and reject merges containing multiple Security Terminals.
-- Native hardware menus require Build; security and pattern management remain owner-only. Block/part menu actions validate live hosts and an eight-block range.
-- Protected network hardware survives explosions, including the entire Security Terminal cable-bus block.
-- External disk transfers are disabled in protected drives, ME Chests, ME IO Ports, and Spatial IO Ports, including handlers cached before terminal installation. Ordinary resource automation continues.
-- The Security Terminal screen is rebuilt from AE2's own terminal parts: AE2's frame and left toolbar, a scrollable player list with lock icons and per-player permission lights, AE2 toggle switches for permissions, a warning badge when the network is in conflict or disconnected, and ownership transfer as a toolbar tab with a confirmation popup. Its style follows resource packs that restyle AE2.
-
-### Fixed
-
-- P2P attunement checks Build on the existing part and any new outward ME connection before replacement.
-- Monitor configuration, facade installation, and physical view-cell changes in shared terminals require Build. Permitted conversion-monitor deposits and withdrawals remain available without Build.
-- Owners can wrench their own terminal through the normal interaction event to resolve a conflicting grid.
-- Partial craft-output collection through wired and wireless storage wrappers spends the allowance exactly once.
-- Part-click packets validate loaded chunks and interaction reach. Wireless Terminals shortcuts refresh their existing range and quantum-link checks before accessing a cached grid.
-
-### Removed
-
-- The unreleased ME Secure Drive, its PIN system, packets, and resources. Development-world Secure Drive blocks and items are not migrated.
-
-### Compatibility
-
-- Client and server must both use this candidate; its payload protocol is version 5.
-- Existing terminal policies, trust entries, and completed-crafting allowances retain their save format.
-
-
-## 1.1.0-dev.1 — unreleased development candidate
+The largest update since 1.0.0. The Security Terminal now protects the network's hardware as well as its storage, adds a Collect permission, operator recovery commands and a rebuilt screen. Client and server must both update.
 
 ### Added
 
-- Craft-only players can collect their own successfully completed autocrafting outputs, limited to the exact final item or fluid and requested amount, with persistent per-player allowances.
-- Craftable ME Secure Drive with AE2 drive storage, a four-digit PIN keypad, and the standard ME Drive inventory layout after unlock.
-- PIN-gated storage-cell and priority controls for the network owner and Build-trusted players, with bounded background PIN work and per-player cooldowns.
-- Secure Drive owner-only mining and wrench removal, terminal identity binding, and final-owner recovery after terminal removal.
-- Server-side player search and bounded directory pages, including players beyond the former snapshot limit.
+- **Hardware protection.** Build now covers placing, mining, wrenching, rotating, configuring and upgrading AE2 network hardware, including drives, controllers, crafting CPUs, quantum bridges and spatial devices, plus full-block hardware from AE2 add-ons that hosts grid nodes. Protected hardware survives explosions and mob griefing.
+- **Storage-cell protection.** Cells in protected drives, ME Chests, IO Ports and Spatial IO Ports are managed by hand by players with Build; hoppers and buses can no longer pull them out. Ordinary item and fluid automation keeps working.
+- **Collect permission.** Players can withdraw their own completed autocrafting outputs, up to the requested amount, without Extract. Craft now only requests, pauses and cancels jobs.
+- **Operator commands.** `/mesecurity info`, `setowner`, `retire` and `bypass` (permission level 2) recover networks whose owner is gone. Bypass ends as soon as the operator is de-opped.
+- **Menu tags.** `ae2security:owner_menus`, `hardware_menus` and `storage_menus` let pack makers classify add-on menus. Unknown add-on menus require Build.
+
+### Changed
+
+- The Security Terminal screen is rebuilt from AE2's own terminal parts: AE2's frame and toolbar, a scrollable player list with lock icons and per-player permission lights, AE2 toggle switches, a warning badge for conflicting or disconnected networks, and ownership transfer as a toolbar tab with a compact confirmation popup. It follows resource packs that restyle AE2.
+- Securing an existing ME network, or bridging a protected network into one, requires having helped build it.
+- Security Terminals can no longer be placed by fake players such as Create deployers.
+- Reducing a permission only closes the ME screens that depend on it.
+- Denial notices are rate-limited per message, so a different reason is no longer hidden.
 
 ### Fixed
 
-- Drive menus now close when the player moves away or the block entity is replaced, and PIN results cannot revive a stale opening.
-- PIN and policy actions report server results in their screens. Priority changes require a valid signed integer and a deliberate save.
-- Secure Drive default naming, icon, mining tag, and background rendering now match their intended AE2 integration.
-- The terminal keeps its selected player aligned with the visible search page and preserves transfer confirmation across unrelated directory updates.
+- Copied Security Terminals (structure templates, `/clone`, pick-block, world editors) get their own identity instead of sharing the original's policy, where removing either copy unprotected the other. Moved terminals keep theirs.
+- Terminals placed without an owning player no longer lock their network.
+- Terminals forget chunks their network has provably left, so split-off pieces are released and saved footprints stop growing.
+- P2P attunement, monitor configuration, facades and view cells in shared terminals require Build. Part-click packets check reach, and Wireless Terminals shortcuts recheck range.
+- The transfer prompt and labels no longer get cut off for long player names.
+- Lower per-tick overhead for protected networks and cell automation.
 
-### Compatibility
+### Compatibility and upgrading
 
-- Client and server must both use this candidate; its payload protocol is version 4.
+- Minecraft 1.21.1, NeoForge 21.1.250, Applied Energistics 2 19.2.17, GuideME 21.1.1, optional AE2 Wireless Terminals 19.5.1.
+- Payload protocol 6: client and server must both use 1.2.0.
+- Saved data moves to format 4 automatically. Worlds from 1.0.0 and 1.1.0 keep their exact permissions; nobody gains Collect.
+- The license is now LGPL-3.0-or-later.
+
+## 1.1.0 - 2026-10-02
+
+- Refined the security terminal screen layout.
+- Added server-sided acknowledgements for policy edits and disabled pending trust and ownership-transfer actions until they complete.
+- Added the search field's help to standard tooltips and narration.
 
 ## 1.0.0 - 2026-09-20
 
