@@ -63,7 +63,7 @@ class SecuritySavedDataTest {
         assertEquals(4, new SecuritySavedData().save(new CompoundTag(), RegistryAccess.EMPTY).getInt("format"));
     }
 
-    @Test void olderFormatsGrantCollectToEveryEntryWithCraft() {
+    @Test void developmentFormatsGrantCollectToEveryEntryWithCraft() {
         var terminal = UUID.randomUUID();
         var owner = UUID.randomUUID();
         var crafter = UUID.randomUUID();
@@ -71,8 +71,8 @@ class SecuritySavedDataTest {
         var collector = UUID.randomUUID();
         var saved = collectWorld(terminal, owner, crafter, extractor, collector)
                 .save(new CompoundTag(), RegistryAccess.EMPTY);
-        // Format 3 and a file with no format at all predate Collect and take the Craft-implies-Collect migration.
-        for (var version : new int[] {3, 2, -1}) {
+        // Development formats 2 and 3 let Craft collect, so they take the Craft-implies-Collect migration.
+        for (var version : new int[] {3, 2}) {
             var legacy = saved.copy();
             if (version < 0) legacy.remove("format");
             else legacy.putInt("format", version);
@@ -82,6 +82,25 @@ class SecuritySavedDataTest {
             assertEquals(Permission.VIEW.bit() | Permission.EXTRACT.bit(), policy.permissions(extractor));
             assertFalse(policy.allows(extractor, Permission.COLLECT));
             assertEquals(Permission.VIEW.bit() | Permission.COLLECT.bit(), policy.permissions(collector));
+        }
+    }
+
+    @Test void publishedFormatOneGrantsNoCollect() {
+        var terminal = UUID.randomUUID();
+        var owner = UUID.randomUUID();
+        var crafter = UUID.randomUUID();
+        var extractor = UUID.randomUUID();
+        var collector = UUID.randomUUID();
+        var saved = collectWorld(terminal, owner, crafter, extractor, collector)
+                .save(new CompoundTag(), RegistryAccess.EMPTY);
+        // Published 1.0.0 and 1.1.0 wrote format 1 and had no collection; a missing format counts as format 1.
+        for (var version : new int[] {1, -1}) {
+            var legacy = saved.copy();
+            if (version < 0) legacy.remove("format");
+            else legacy.putInt("format", version);
+            var policy = SecuritySavedData.load(legacy, RegistryAccess.EMPTY).policy(terminal);
+            assertEquals(CRAFT_ONLY, policy.permissions(crafter), "format " + version);
+            assertFalse(policy.allows(crafter, Permission.COLLECT), "format " + version);
         }
     }
 

@@ -266,7 +266,10 @@ public final class SecuritySavedData extends SavedData {
         var data = new SecuritySavedData();
         // Malformed policy or tombstone data is a world error, never a reason to make storage public or
         // to start over empty. It must leave as an Error: see CorruptDataError.
-        boolean craftImpliesCollect = !tag.contains("format", Tag.TAG_ANY_NUMERIC) || tag.getInt("format") < 4;
+        // Craft let players collect finished outputs only in the unreleased development formats 2 and 3.
+        // Published 1.0.0 and 1.1.0 wrote format 1 and had no collection, so their Craft grants nothing more.
+        int format = tag.contains("format", Tag.TAG_ANY_NUMERIC) ? tag.getInt("format") : 1;
+        boolean craftImpliesCollect = format == 2 || format == 3;
         try {
             for (var element : strictList(tag, "policies", Tag.TAG_COMPOUND)) {
                 var row = (CompoundTag) element;
