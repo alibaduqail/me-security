@@ -1,7 +1,5 @@
 package dev.ae2security.client;
 
-import java.util.Locale;
-
 import appeng.client.gui.Icon;
 import appeng.client.gui.style.PaletteColor;
 import appeng.client.gui.style.ScreenStyle;
@@ -15,7 +13,7 @@ import net.minecraft.network.chat.Component;
 
 /**
  * Layout and text of the right-hand column, the selected player's access: the five permission
- * switches, Trust/Remove trust and the edit status under it. Ownership transfer lives in its own
+ * switches, Trust/Remove trust and, under it, why the last edit failed. Ownership transfer lives in its own
  * toolbar tab and popup. The selected player is named by their highlighted list row, and by
  * the list footer while they are on another page.
  * <p>
@@ -67,8 +65,8 @@ final class AccessPanel {
      * @param editStatus the result of the last blocking edit, or null
      * @param statusOwnedByPopup whether the transfer popup is open and shows the status itself
      */
-    void draw(GuiGraphics graphics, PolicySnapshot.PlayerEntry selected, boolean pending,
-            PolicyEditResult.Result editStatus, boolean statusOwnedByPopup) {
+    void draw(GuiGraphics graphics, PolicySnapshot.PlayerEntry selected, PolicyEditResult.Result editStatus,
+            boolean statusOwnedByPopup) {
         int text = SecurityGui.color(style, PaletteColor.DEFAULT_TEXT_COLOR);
         int muted = SecurityGui.color(style, PaletteColor.MUTED_TEXT_COLOR);
         int x = box.getX();
@@ -93,14 +91,13 @@ final class AccessPanel {
                     top + (space - lines * font.lineHeight) / 2, width - 4, muted);
         }
 
-        if (!statusOwnedByPopup && (pending || editStatus != null)) {
-            var status = Component.translatable(pending ? "screen.ae2security.pending"
-                    : "screen.ae2security.edit_result." + editStatus.name().toLowerCase(Locale.ROOT));
-            int color = pending ? muted : editStatus == PolicyEditResult.Result.APPLIED ? text
-                    : SecurityGui.color(style, PaletteColor.ERROR);
-            var lines = font.split(status, width);
+        // A saved change shows itself in the switches and the list, so only failures get a line.
+        var failure = SecurityScreenText.editFailureKey(editStatus);
+        if (!statusOwnedByPopup && failure != null) {
+            int error = SecurityGui.color(style, PaletteColor.ERROR);
+            var lines = font.split(Component.translatable(failure), width);
             for (int i = 0; i < Math.min(2, lines.size()); i++) {
-                graphics.drawString(font, lines.get(i), x, statusY() + i * font.lineHeight, color, false);
+                graphics.drawString(font, lines.get(i), x, statusY() + i * font.lineHeight, error, false);
             }
         }
     }
