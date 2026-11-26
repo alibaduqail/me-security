@@ -29,7 +29,7 @@ side="BOTH"
 [[dependencies.ae2security]]
 modId="ae2"
 type="required"
-versionRange="[19.2.17]"
+versionRange="[19.2.20]"
 ordering="AFTER"
 side="BOTH"
 
