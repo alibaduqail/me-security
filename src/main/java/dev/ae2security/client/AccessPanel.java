@@ -1,8 +1,6 @@
 package dev.ae2security.client;
 
-import java.util.List;
 import java.util.Locale;
-import java.util.UUID;
 
 import appeng.client.gui.Icon;
 import appeng.client.gui.style.PaletteColor;
@@ -16,21 +14,20 @@ import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.network.chat.Component;
 
 /**
- * Layout and text of the right-hand column, the selected player's access. Its widgets belong
- * to the screen; this class places them and draws everything else: the empty and untrusted
- * states, the transfer prompt and the edit status. The selected player is named by their
- * highlighted list row, and by the list footer while they are on another page.
+ * Layout and text of the right-hand column, the selected player's access: the five permission
+ * switches, Trust/Remove trust and the edit status under it. Ownership transfer lives in its own
+ * toolbar tab and popup. The selected player is named by their highlighted list row, and by
+ * the list footer while they are on another page.
  * <p>
- * The permission switches start level with the search field and Trust/Remove trust follows
- * them; the transfer group is anchored to the bottom, level with the bottom of the list.
+ * The switches start level with the search field; the status line's second row ends level with
+ * the bottom of the list, so the column has no space it does not use.
  */
 final class AccessPanel {
     static final int BUTTON_HEIGHT = 18;
-    private static final int TRUST_GAP = 4;
-    // The transfer group is anchored to the column's bottom edge.
-    private static final int TRANSFER_FROM_BOTTOM = 18;
-    private static final int TRANSFER_NAME_FROM_BOTTOM = 32;
-    private static final int STATUS_LINE_FROM_BOTTOM = 42;
+    /** An 18px slot row plus a 2px gap. */
+    private static final int ROW_PITCH = 20;
+    private static final int TRUST_GAP = 2;
+    private static final int STATUS_GAP = 3;
     /** Height of the "Select a player" block: slot, heading and a hint of up to three lines. */
     private static final int EMPTY_STATE_HEIGHT = 64;
 
@@ -53,33 +50,25 @@ final class AccessPanel {
     }
 
     int permissionY(int row) {
-        return box.getY() + row * PermissionSwitch.HEIGHT;
+        return box.getY() + row * ROW_PITCH;
     }
 
     int trustY() {
         return permissionY(Permission.editable().size()) + TRUST_GAP;
     }
 
-    int transferNameY() {
-        return bottom() - TRANSFER_NAME_FROM_BOTTOM;
-    }
-
-    int transferY() {
-        return bottom() - TRANSFER_FROM_BOTTOM;
-    }
-
-    private int bottom() {
-        return box.getY() + box.getHeight();
+    private int statusY() {
+        return trustY() + BUTTON_HEIGHT + STATUS_GAP;
     }
 
     /**
      * Draws the column's text, relative to the frame.
      *
-     * @param transferConfirmation the player whose ownership transfer awaits their typed name, or null
      * @param editStatus the result of the last blocking edit, or null
+     * @param statusOwnedByPopup whether the transfer popup is open and shows the status itself
      */
-    void draw(GuiGraphics graphics, PolicySnapshot.PlayerEntry selected, UUID transferConfirmation,
-            boolean pending, PolicyEditResult.Result editStatus) {
+    void draw(GuiGraphics graphics, PolicySnapshot.PlayerEntry selected, boolean pending,
+            PolicyEditResult.Result editStatus, boolean statusOwnedByPopup) {
         int text = SecurityGui.color(style, PaletteColor.DEFAULT_TEXT_COLOR);
         int muted = SecurityGui.color(style, PaletteColor.MUTED_TEXT_COLOR);
         int x = box.getX();
@@ -104,26 +93,14 @@ final class AccessPanel {
                     top + (space - lines * font.lineHeight) / 2, width - 4, muted);
         }
 
-        // The transfer prompt and the edit status share one line; the status wins while an edit is pending.
-        int lineY = bottom() - STATUS_LINE_FROM_BOTTOM;
-        if (selected != null && selected.id().equals(transferConfirmation) && !pending) {
-            var name = selected.name();
-            var prompt = SecurityScreenText.firstThatFits(List.of(
-                    Component.translatable("screen.ae2security.transfer_prompt", name).getString(),
-                    Component.translatable("screen.ae2security.transfer_prompt_short", name).getString(),
-                    name), width, font::width);
-            SecurityGui.text(graphics, font, font.plainSubstrByWidth(prompt, width), x, lineY, muted);
-        }
-        if (pending || editStatus != null && transferConfirmation == null) {
+        if (!statusOwnedByPopup && (pending || editStatus != null)) {
             var status = Component.translatable(pending ? "screen.ae2security.pending"
                     : "screen.ae2security.edit_result." + editStatus.name().toLowerCase(Locale.ROOT));
             int color = pending ? muted : editStatus == PolicyEditResult.Result.APPLIED ? text
                     : SecurityGui.color(style, PaletteColor.ERROR);
-            // A result is only shown while no transfer is being confirmed, so the name field's
-            // row is free for a second line.
             var lines = font.split(status, width);
             for (int i = 0; i < Math.min(2, lines.size()); i++) {
-                graphics.drawString(font, lines.get(i), x, lineY + i * font.lineHeight, color, false);
+                graphics.drawString(font, lines.get(i), x, statusY() + i * font.lineHeight, color, false);
             }
         }
     }

@@ -15,7 +15,7 @@ import net.minecraft.network.chat.Component;
  * everyone else a dimmed closed lock.
  */
 final class PlayerRowButton extends Button {
-    static final int HEIGHT = 24;
+    static final int HEIGHT = 20;
     private static final int TEXT_LEFT = 22;
 
     private final ScreenStyle style;
@@ -53,15 +53,15 @@ final class PlayerRowButton extends Button {
         // AE2's white glyphs vanish on the light selection blue, so draw them in the text color there.
         if (selected) icon.colorRgb(textColor & 0xFFFFFF);
         if (!trusted) icon.opacity(0.55f);
-        icon.dest(x + 3, y + 4).blit(graphics);
+        icon.dest(x + 3, y + 2).blit(graphics);
 
         // Names are at most 16 characters, so the widest still fits; clip defensively anyway.
         var name = font.plainSubstrByWidth(player.name(), width - TEXT_LEFT - 2);
         if (trusted) {
-            SecurityGui.text(graphics, font, name, x + TEXT_LEFT, y + 4, textColor);
-            SecurityGui.accessLeds(graphics, style, x + TEXT_LEFT, y + 15, player.permissions());
+            SecurityGui.text(graphics, font, name, x + TEXT_LEFT, y + 2, textColor);
+            SecurityGui.accessLeds(graphics, style, x + TEXT_LEFT, y + 12, player.permissions());
         } else {
-            SecurityGui.text(graphics, font, name, x + TEXT_LEFT, y + 8, textColor);
+            SecurityGui.text(graphics, font, name, x + TEXT_LEFT, y + 6, textColor);
         }
     }
 }

@@ -89,9 +89,10 @@ break its containing block**, even if another player has Build or is in Creative
 
 ## Transferring ownership
 
-Select a trusted player and click **Transfer ownership**. Type that player's name in
-the confirmation field, then click **Confirm transfer**. Other trusted entries stay
-in place. The previous owner loses access unless the new owner trusts them afterward.
+Select a trusted player and click the **Transfer ownership** tab, the arrow under the
+guide button on the left of the screen. Type that player's name in the confirmation
+window, then click **Confirm**, or **Cancel** to back out. Other trusted entries
+stay in place. The previous owner loses access unless the new owner trusts them afterward.
 
 ## Wireless access and automation
 

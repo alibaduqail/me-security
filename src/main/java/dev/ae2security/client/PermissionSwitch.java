@@ -1,9 +1,12 @@
 package dev.ae2security.client;
 
+import java.util.Locale;
+
 import appeng.client.gui.Icon;
 import appeng.client.gui.style.PaletteColor;
 import appeng.client.gui.style.ScreenStyle;
 import appeng.client.gui.widgets.AECheckbox;
+import dev.ae2security.security.Permission;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
@@ -26,6 +29,21 @@ final class PermissionSwitch extends AECheckbox {
         this.style = style;
         this.icon = icon;
         this.onToggle = onToggle;
+    }
+
+    static String key(Permission permission) {
+        return "permission.ae2security." + permission.name().toLowerCase(Locale.ROOT);
+    }
+
+    static Icon icon(Permission permission) {
+        return switch (permission) {
+            case VIEW -> Icon.VIEW_MODE_STORED;
+            case INSERT -> Icon.ACCESS_WRITE;
+            case EXTRACT -> Icon.ACCESS_READ;
+            case CRAFT -> Icon.CRAFT_HAMMER;
+            case COLLECT -> Icon.AUTO_EXPORT_ON;
+            case BUILD -> Icon.PLACEMENT_ITEM;
+        };
     }
 
     @Override
