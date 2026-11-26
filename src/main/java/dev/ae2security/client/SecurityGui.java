@@ -122,6 +122,14 @@ final class SecurityGui {
         graphics.drawString(font, text, centerX - font.width(text) / 2, y, argb, false);
     }
 
+    /** A short message centered in a box, such as the empty player list. */
+    static void centeredIn(GuiGraphics graphics, ScreenStyle style, Font font, Rect2i box, Component message) {
+        int centerX = box.getX() + box.getWidth() / 2;
+        int y = box.getY() + (box.getHeight() - font.lineHeight) / 2;
+        wrappedCentered(graphics, font, message, centerX, y, box.getWidth() - 8,
+                color(style, PaletteColor.DEFAULT_TEXT_COLOR));
+    }
+
     /** Word-wrapped, centered lines; returns the y below the last line. */
     static int wrappedCentered(GuiGraphics graphics, Font font, Component text, int centerX, int y, int width,
             int argb) {

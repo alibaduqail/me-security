@@ -4,7 +4,7 @@
   "includes": ["../common/common.json"],
   "generatedBackground": {
     "width": 282,
-    "height": 214
+    "height": 190
   },
   "images": {
     "well": {
@@ -53,23 +53,23 @@
       "height": 12
     },
     "playerList": {
-      "$comment": "Six 24px rows, 1px apart, inside a 1px frame.",
+      "$comment": "Six 20px rows (one server page), 1px apart, inside a 1px frame.",
       "left": 7,
       "top": 43,
       "width": 124,
-      "height": 151
+      "height": 127
     },
     "playerScrollbar": {
       "left": 133,
       "top": 43,
       "width": 9,
-      "height": 151
+      "height": 127
     },
     "details": {
       "left": 150,
       "top": 28,
       "width": 124,
-      "height": 166
+      "height": 142
     }
   }
 }

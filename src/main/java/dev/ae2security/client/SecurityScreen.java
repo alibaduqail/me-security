@@ -2,14 +2,12 @@ package dev.ae2security.client;
 
 import java.util.EnumMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
 import com.mojang.blaze3d.platform.InputConstants;
 
 import appeng.client.Point;
-import appeng.client.gui.Icon;
 import appeng.client.gui.style.BackgroundGenerator;
 import appeng.client.gui.style.PaletteColor;
 import appeng.client.gui.style.ScreenStyle;
@@ -29,6 +27,7 @@ import guideme.GuidesCommon;
 import guideme.PageAnchor;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.Rect2i;
@@ -56,7 +55,8 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
     private AETextField search;
     private AETextField transferName;
     private AE2Button trustButton;
-    private AE2Button transferButton;
+    private TransferTabButton transferTab;
+    private TransferPopup popup;
     private PlayerPageScroll pageScroll;
     private AccessPanel access;
     private VerticalButtonBar toolbar;
@@ -65,6 +65,10 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
     private final PendingEdits edits = new PendingEdits();
     private UUID transferConfirmation;
     private String transferInput = "";
+    /** Whether the open popup sent a transfer, so the edit status it shows is its own. */
+    private boolean transferRequested;
+    /** A transfer's result belongs to the popup, not to the access panel. */
+    private boolean lastEditWasTransfer;
     private PolicySnapshot displayed;
 
     public SecurityScreen(SecurityMenu menu, Inventory inventory, Component title) {
@@ -90,8 +94,10 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
             }
         });
         help.setTooltip(Tooltip.create(Component.translatable("screen.ae2security.guide")));
+        transferTab = new TransferTabButton(button -> openTransferPopup());
         toolbar = new VerticalButtonBar();
         toolbar.add(help);
+        toolbar.add(transferTab);
         toolbar.setPosition(style.getWidget("verticalToolbar").resolve(new Rect2i(0, 0, imageWidth, imageHeight)));
         toolbar.populateScreen(this::addRenderableWidget, new Rect2i(leftPos, topPos, imageWidth, imageHeight), null);
         toolbar.updateBeforeRender();
@@ -124,48 +130,29 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         int width = access.width();
         for (int row = 0; row < Permission.editable().size(); row++) {
             var permission = Permission.editable().get(row);
-            var toggle = new PermissionSwitch(style, permissionIcon(permission),
-                    Component.translatable(permissionKey(permission)), left, topPos + access.permissionY(row),
+            var toggle = new PermissionSwitch(style, PermissionSwitch.icon(permission),
+                    Component.translatable(PermissionSwitch.key(permission)), left, topPos + access.permissionY(row),
                     width, () -> togglePermission(permission));
             permissionSwitches.put(permission, addRenderableWidget(toggle));
         }
 
         trustButton = addRenderableWidget(new AE2Button(left, topPos + access.trustY(), width,
                 AccessPanel.BUTTON_HEIGHT, Component.empty(), button -> toggleTrust()));
-        transferName = addRenderableWidget(new AETextField(style, font, left, topPos + access.transferNameY(),
-                width, 12));
-        transferName.setBordered(false);
-        transferName.setMaxLength(64);
-        transferName.setPlaceholder(Component.translatable("screen.ae2security.transfer_name"));
-        transferName.setMessage(Component.translatable("screen.ae2security.transfer_name"));
+        // The popup's widgets are not children of the screen: it draws them over the dimmed
+        // screen and receives all input itself while it is open.
+        popup = new TransferPopup(style, font, this.width, this.height, this::transferOwnership, this::cancelTransfer);
+        transferName = popup.field;
         transferName.setValue(transferInput);
         transferName.setResponder(value -> {
             transferInput = value;
+            if (!edits.pending()) transferRequested = false; // editing brings the prompt back
             refreshControls();
         });
-        transferButton = addRenderableWidget(new AE2Button(left, topPos + access.transferY(), width,
-                AccessPanel.BUTTON_HEIGHT, Component.empty(), button -> transferOwnership()));
-        transferButton.setTooltip(Tooltip.create(Component.translatable("screen.ae2security.transfer_warning")));
 
         displayed = menu.snapshot();
         if (displayed != null) players.refresh(true);
         refreshControls();
         setInitialFocus(search);
-    }
-
-    private static String permissionKey(Permission permission) {
-        return "permission.ae2security." + permission.name().toLowerCase(Locale.ROOT);
-    }
-
-    private static Icon permissionIcon(Permission permission) {
-        return switch (permission) {
-            case VIEW -> Icon.VIEW_MODE_STORED;
-            case INSERT -> Icon.ACCESS_WRITE;
-            case EXTRACT -> Icon.ACCESS_READ;
-            case CRAFT -> Icon.CRAFT_HAMMER;
-            case COLLECT -> Icon.AUTO_EXPORT_ON;
-            case BUILD -> Icon.PLACEMENT_ITEM;
-        };
     }
 
     private void turnPage(int delta) {
@@ -199,27 +186,45 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         }
     }
 
-    private void transferOwnership() {
+    /** The toolbar tab: opens the confirmation for the selected trusted player. */
+    private void openTransferPopup() {
         var player = players.selection();
-        if (player == null) {
+        if (player == null || !player.trusted()) {
             return;
         }
+        transferConfirmation = player.id();
+        transferInput = "";
+        transferRequested = false;
+        transferName.setValue("");
+        refreshControls();
+        setFocused(transferName);
+    }
 
-        if (player.id().equals(transferConfirmation)) {
-            if (OwnershipConfirmation.matches(player.name(), transferInput)) {
-                send(EditPolicy.Action.TRANSFER, 0, transferInput);
-            } else if (minecraft != null && minecraft.player != null) {
-                minecraft.player.displayClientMessage(Component.translatable(
-                        "message.ae2security.transfer_name_mismatch", player.name()), true);
-                setFocused(transferName);
-            }
-        } else {
-            transferConfirmation = player.id();
-            transferInput = "";
-            transferName.setValue("");
-            refreshControls();
+    /** The popup's Confirm: the same typed-name check and TRANSFER edit as before. */
+    private void transferOwnership() {
+        var player = players.selection();
+        if (player == null || !player.id().equals(transferConfirmation)) {
+            return;
+        }
+        if (OwnershipConfirmation.matches(player.name(), transferInput)) {
+            transferRequested = true;
+            send(EditPolicy.Action.TRANSFER, 0, transferInput);
+        } else if (minecraft != null && minecraft.player != null) {
+            minecraft.player.displayClientMessage(Component.translatable(
+                    "message.ae2security.transfer_name_mismatch", player.name()), true);
             setFocused(transferName);
         }
+    }
+
+    private void cancelTransfer() {
+        clearTransferConfirmation();
+        refreshControls();
+    }
+
+    /** The popup is open while the selected, still trusted player awaits confirmation. */
+    private boolean popupOpen() {
+        var player = players.selection();
+        return popup != null && player != null && player.trusted() && player.id().equals(transferConfirmation);
     }
 
     private void refreshControls() {
@@ -252,8 +257,8 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         for (var permission : Permission.editable()) {
             boolean enabled = player != null && permission.in(player.permissions());
             var button = permissionSwitches.get(permission);
-            var name = Component.translatable(permissionKey(permission));
-            var description = Component.translatable(permissionKey(permission) + ".description");
+            var name = Component.translatable(PermissionSwitch.key(permission));
+            var description = Component.translatable(PermissionSwitch.key(permission) + ".description");
             button.setSelected(enabled);
             button.visible = trusted;
             button.active = trusted && !pending && !searchPending;
@@ -272,14 +277,15 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         trustButton.visible = player != null;
         trustButton.active = player != null && !pending && !searchPending;
 
-        boolean confirming = trusted && player.id().equals(transferConfirmation);
-        transferName.visible = confirming;
+        // Only trusted players can receive ownership.
+        transferTab.active = trusted && !pending && !searchPending;
+        transferTab.setTooltip(Tooltip.create(Component.translatable("screen.ae2security.transfer").append("\n")
+                .append(Component.translatable(trusted ? "screen.ae2security.transfer_warning"
+                        : "screen.ae2security.transfer_needs_trusted").withStyle(ChatFormatting.GRAY))));
+        boolean confirming = popupOpen();
         transferName.active = confirming && !pending && !searchPending;
-        transferButton.setMessage(Component.translatable(
-                confirming ? "screen.ae2security.confirm_transfer" : "screen.ae2security.transfer"));
-        transferButton.visible = trusted;
-        transferButton.active = trusted && !pending && !searchPending
-                && (!confirming || OwnershipConfirmation.matches(player.name(), transferInput));
+        popup.confirm.active = confirming && !pending && !searchPending
+                && OwnershipConfirmation.matches(player.name(), transferInput);
     }
 
     private void send(EditPolicy.Action action, int mask) {
@@ -300,6 +306,7 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         if (requestId == PendingEdits.BLOCKED) {
             return;
         }
+        lastEditWasTransfer = action == EditPolicy.Action.TRANSFER;
         PacketDistributor.sendToServer(new EditPolicy(menu.containerId, requestId, snapshot.revision(), player.id(),
                 action, mask, confirmation));
         refreshControls();
@@ -308,8 +315,9 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
     private void clearTransferConfirmation() {
         transferConfirmation = null;
         transferInput = "";
-        if (transferName != null) transferName.setValue("");
-        if (transferName != null) transferName.setFocused(false);
+        transferRequested = false;
+        transferName.setValue("");
+        transferName.setFocused(false);
         if (getFocused() == transferName) setFocused(null);
     }
 
@@ -346,6 +354,13 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (popupOpen()) {
+            var action = popup.keyPressed(keyCode, scanCode, modifiers);
+            if (action == TransferPopup.KeyAction.CANCEL) cancelTransfer();
+            if (action == TransferPopup.KeyAction.CONFIRM) transferOwnership();
+            // Nothing behind the popup sees keys; the inventory key types into its field.
+            return true;
+        }
         if ((search != null && search.isFocused() || transferName != null && transferName.isFocused())
                 && minecraft != null
                 && minecraft.options.keyInventory.isActiveAndMatches(InputConstants.getKey(keyCode, scanCode))) {
@@ -361,7 +376,18 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
     }
 
     @Override
+    public boolean charTyped(char codePoint, int modifiers) {
+        if (!popupOpen()) return super.charTyped(codePoint, modifiers);
+        transferName.charTyped(codePoint, modifiers);
+        return true;
+    }
+
+    @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (popupOpen()) {
+            popup.mouseClicked(mouseX, mouseY, button);
+            return true;
+        }
         if (pageScroll.mouseClicked(local(mouseX, mouseY), button)) {
             followScrollbar();
             return true;
@@ -371,6 +397,7 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (popupOpen()) return true;
         if (pageScroll.mouseDragged(local(mouseX, mouseY), button)) {
             followScrollbar();
             return true;
@@ -380,12 +407,14 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (popupOpen()) return popup.mouseReleased(mouseX, mouseY, button);
         pageScroll.mouseReleased(local(mouseX, mouseY), button);
         return super.mouseReleased(mouseX, mouseY, button);
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (popupOpen()) return true;
         if (pageScroll.mouseScrolled(local(mouseX, mouseY), scrollY)) {
             followScrollbar();
             return true;
@@ -416,7 +445,7 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         var snapshot = menu.snapshot();
         if (snapshot == null) {
             SecurityGui.text(graphics, font, Component.translatable("screen.ae2security.loading"), 8, 17, muted);
-            drawListMessage(graphics, Component.translatable("screen.ae2security.loading"));
+            SecurityGui.centeredIn(graphics, style, font, listBox, Component.translatable("screen.ae2security.loading"));
             return;
         }
 
@@ -427,7 +456,7 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
                 8, 17, muted);
 
         if (players.players().isEmpty()) {
-            drawListMessage(graphics, Component.translatable(players.searching()
+            SecurityGui.centeredIn(graphics, style, font, listBox, Component.translatable(players.searching()
                     ? "screen.ae2security.searching" : "screen.ae2security.no_players"));
         }
         int footerY = listBox.getY() + listBox.getHeight() + 3;
@@ -448,20 +477,22 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
                     listBox.getX() + 1, footerY, muted);
         }
 
-        access.draw(graphics, players.selection(), transferConfirmation, edits.pending(), edits.status());
-    }
-
-    private void drawListMessage(GuiGraphics graphics, Component message) {
-        int centerX = listBox.getX() + listBox.getWidth() / 2;
-        int y = listBox.getY() + (listBox.getHeight() - font.lineHeight) / 2;
-        SecurityGui.wrappedCentered(graphics, font, message, centerX, y, listBox.getWidth() - 8,
-                SecurityGui.color(style, PaletteColor.DEFAULT_TEXT_COLOR));
+        access.draw(graphics, players.selection(), edits.pending(), lastEditWasTransfer ? null : edits.status(),
+                popupOpen());
     }
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         toolbar.updateBeforeRender();
-        super.render(graphics, mouseX, mouseY, partialTick);
-        renderTooltip(graphics, mouseX, mouseY);
+        boolean open = popupOpen();
+        // Under the popup nothing is hovered, so nothing highlights or shows a tooltip.
+        int screenMouseX = open ? -1 : mouseX;
+        int screenMouseY = open ? -1 : mouseY;
+        super.render(graphics, screenMouseX, screenMouseY, partialTick);
+        renderTooltip(graphics, screenMouseX, screenMouseY);
+        if (open) {
+            popup.render(graphics, width, height, players.selection().name(), edits.pending(),
+                    transferRequested ? edits.status() : null, mouseX, mouseY, partialTick);
+        }
     }
 }

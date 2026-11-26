@@ -27,7 +27,7 @@ Attach the terminal to an ME cable or a compatible device face, just like an ord
 
 Only a player who helped build a network can secure it: placing a terminal on an existing network requires owning at least one of its nodes, while networks where no node has a recorded owner (machine-placed hardware, very old worlds) stay open to anyone. The same rule stops you from joining your protected network to someone else's unprotected network with a cable. Extending your own network is unaffected.
 
-Only the owner can edit permissions or manage patterns. Transferring ownership opens a confirmation field that requires the selected player's name. Trusted entries remain after transfer, while the previous owner loses access unless the new owner trusts them later.
+Only the owner can edit permissions or manage patterns. Transferring ownership, from the arrow tab in the screen's left toolbar, opens a confirmation window that requires the selected player's name. Trusted entries remain after transfer, while the previous owner loses access unless the new owner trusts them later.
 
 | Permission | Effect |
 |---|---|
