@@ -2,7 +2,7 @@
 
 ME Security is a NeoForge addon for Applied Energistics 2 that restores a classic-inspired ME Security Terminal. The terminal is an AE2 cable part; attaching it makes an ME grid private to its owner and lets that owner grant per-player access.
 
-The current release is **1.2.1**. Its payload protocol (version 6) is incompatible with 1.1.0 and
+The current release is **1.2.2**. Its payload protocol (version 6) is incompatible with 1.1.0 and
 earlier, so clients and servers must update together. See [CHANGELOG.md](CHANGELOG.md) for release notes.
 ME Security is licensed under the GNU Lesser General Public License v3.0 or later.
 
@@ -14,12 +14,12 @@ Install the same mod set on the client and dedicated server.
 |---|---:|---:|
 | Minecraft | 1.21.1 | Yes |
 | Java | 21 | Yes |
-| NeoForge | 21.1.250 | Yes |
+| NeoForge | 21.1.250 or newer 21.1.x | Yes |
 | Applied Energistics 2 | 19.2.20 | Yes |
-| GuideME | 21.1.1 | Yes; supplied by AE2 |
+| GuideME | 21.1.1 or newer | Yes; separate mod that AE2 requires |
 | AE2 Wireless Terminals | 19.5.1 | No |
 
-The dependency ranges are deliberately exact. ME Security uses version-targeted enforcement hooks and refuses unsupported combinations instead of silently disabling a check.
+The AE2 and AE2 Wireless Terminals versions are deliberately exact. ME Security uses version-targeted enforcement hooks and refuses unsupported combinations instead of silently disabling a check. NeoForge and GuideME accept newer releases.
 
 ## Using the terminal
 
@@ -81,4 +81,4 @@ ME Security controls player access through supported AE2 and AE2 Wireless Termin
 
 Hardware protection applies to native AE2 network devices and to add-on blocks that host AE2 grid nodes, and follows actual network connections, including conservative protection during unresolved topology. Add-on menus that the tags above do not classify require Build; add-on pattern-management screens become owner-only only when a pack adds them to `owner_menus`. Hopper and bus protection for storage-cell slots covers add-on devices only when they extend AE2's drive, ME Chest, IO Port, Spatial IO Port, or quantum bridge. It does not protect arbitrary third-party movers or tools, vanilla and third-party world-editing commands such as `/setblock` or WorldEdit, external inventories, or machine outputs. The only administrative commands the mod provides are the `/mesecurity` recovery commands below; it does not provide land claims, access history, or lockdown controls.
 
-Compatibility is limited to the exact versions in the table. Adding another terminal mod or changing an existing menu or packet path requires an explicit integration review; unknown integrations are not claimed to be protected.
+Compatibility is limited to the versions in the table; AE2 and AE2 Wireless Terminals must match exactly. Adding another terminal mod or changing an existing menu or packet path requires an explicit integration review; unknown integrations are not claimed to be protected.
