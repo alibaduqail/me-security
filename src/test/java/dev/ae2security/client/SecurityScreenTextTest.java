@@ -2,8 +2,11 @@ package dev.ae2security.client;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import java.util.UUID;
 
 import dev.ae2security.network.PolicySnapshot;
@@ -20,6 +23,20 @@ class SecurityScreenTextTest {
 
         var translated = assertInstanceOf(TranslatableContents.class, tooltip.getContents());
         assertEquals(uuid.toString(), translated.getArgs()[1]);
+    }
+
+    @Test
+    void selectionIsListedByIdEvenWhenItsRowIsStale() {
+        var selected = new PolicySnapshot.PlayerEntry(
+                UUID.fromString("404198aa-cc64-3021-9fdf-8766c0d0096c"), "Guest", true, 3);
+        var staleRow = new PolicySnapshot.PlayerEntry(selected.id(), "Guest", false, 0);
+        var other = new PolicySnapshot.PlayerEntry(
+                UUID.fromString("0f0e3c8a-1b2d-3e4f-8a9b-0c1d2e3f4a5b"), "Other", false, 0);
+
+        assertTrue(SecurityScreenText.isListed(List.of(other, staleRow), selected));
+        assertFalse(SecurityScreenText.isListed(List.of(other), selected),
+                "a selection kept after trusting moves it to another page is not on this one");
+        assertFalse(SecurityScreenText.isListed(List.of(), selected));
     }
 
     @Test

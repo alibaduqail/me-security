@@ -16,6 +16,17 @@ final class SecurityScreenText {
                 player.name(), player.id().toString());
     }
 
+    /**
+     * Whether the selected player has a row on the shown page. Compared by UUID: the row and
+     * the selection may carry different trust or permissions while an update is in flight.
+     */
+    static boolean isListed(List<PolicySnapshot.PlayerEntry> rows, PolicySnapshot.PlayerEntry selected) {
+        for (var row : rows) {
+            if (row.id().equals(selected.id())) return true;
+        }
+        return false;
+    }
+
     /** The first candidate no wider than {@code maxWidth}, or the last one when none fits. */
     static String firstThatFits(List<String> candidates, int maxWidth, ToIntFunction<String> width) {
         for (var candidate : candidates) {
