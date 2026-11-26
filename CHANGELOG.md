@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.1 - 2026-11-26
+
+### Changed
+
+- Updated to Applied Energistics 2 19.2.20, the newest AE2 for Minecraft 1.21.1. AE2 19.2.20 is now required; 19.2.17 is no longer supported.
+- AE2 Wireless Terminals 19.5.1 remains the supported optional version; it officially supports AE2 19.2.17 through 19.x.
+
+### Compatibility
+
+- Minecraft 1.21.1, NeoForge 21.1.250, Applied Energistics 2 19.2.20, GuideME 21.1.1, optional AE2 Wireless Terminals 19.5.1.
+- No save or protocol changes from 1.2.0. Payload protocol stays at 6, and 1.2.0 and 1.2.1 clients and servers can connect to each other as long as they use the same AE2 version.
+
 ## 1.2.0 - 2026-11-26
 
 The largest update since 1.0.0. The Security Terminal now protects the network's hardware as well as its storage, adds a Collect permission, operator recovery commands and a rebuilt screen. Client and server must both update.
