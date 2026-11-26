@@ -27,7 +27,7 @@ import guideme.GuidesCommon;
 import guideme.PageAnchor;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.ChatFormatting;
+import net.minecraft.client.gui.components.AbstractButton;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.Rect2i;
@@ -175,6 +175,15 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         refreshControls();
     }
 
+    /**
+     * While an edit is unacknowledged or the list is reloading, the selection may be stale, so
+     * clicks are ignored. The controls keep their normal look meanwhile: greying them out for
+     * the few ticks of each round trip made the whole column flicker on every click.
+     */
+    private boolean busy() {
+        return edits.pending() || players.searching();
+    }
+
     private void togglePermission(Permission permission) {
         send(EditPolicy.Action.TOGGLE_PERMISSION, permission.bit());
     }
@@ -189,7 +198,7 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
     /** The toolbar tab: opens the confirmation for the selected trusted player. */
     private void openTransferPopup() {
         var player = players.selection();
-        if (player == null || !player.trusted()) {
+        if (player == null || !player.trusted() || busy()) {
             return;
         }
         transferConfirmation = player.id();
@@ -261,7 +270,7 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
             var description = Component.translatable(PermissionSwitch.key(permission) + ".description");
             button.setSelected(enabled);
             button.visible = trusted;
-            button.active = trusted && !pending && !searchPending;
+            button.active = trusted;
             button.setTooltip(Tooltip.create(Component.empty()
                     .append(Component.translatable(
                             enabled ? "screen.ae2security.permission_enabled"
@@ -271,14 +280,13 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
                     .append(description.withStyle(ChatFormatting.GRAY))));
         }
 
-        trustButton.setMessage(Component.translatable(pending
-                ? "screen.ae2security.pending"
-                : trusted ? "screen.ae2security.remove" : "screen.ae2security.trust"));
+        trustButton.setMessage(Component.translatable(
+                trusted ? "screen.ae2security.remove" : "screen.ae2security.trust"));
         trustButton.visible = player != null;
-        trustButton.active = player != null && !pending && !searchPending;
+        trustButton.active = player != null;
 
         // Only trusted players can receive ownership.
-        transferTab.active = trusted && !pending && !searchPending;
+        transferTab.active = trusted;
         transferTab.setTooltip(Tooltip.create(Component.translatable("screen.ae2security.transfer").append("\n")
                 .append(Component.translatable(trusted ? "screen.ae2security.transfer_warning"
                         : "screen.ae2security.transfer_needs_trusted").withStyle(ChatFormatting.GRAY))));
@@ -295,7 +303,7 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
     private void send(EditPolicy.Action action, int mask, String confirmation) {
         var snapshot = menu.snapshot();
         var player = players.selection();
-        if (snapshot == null || player == null) {
+        if (snapshot == null || player == null || players.searching()) {
             return;
         }
 
@@ -392,7 +400,11 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
             followScrollbar();
             return true;
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        boolean handled = super.mouseClicked(mouseX, mouseY, button);
+        // A clicked button keeps keyboard focus, and focus draws the hover look, so a switch
+        // stayed highlighted after the mouse left it. Only keyboard navigation should focus it.
+        if (getFocused() instanceof AbstractButton) setFocused(null);
+        return handled;
     }
 
     @Override
@@ -477,8 +489,7 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
                     listBox.getX() + 1, footerY, muted);
         }
 
-        access.draw(graphics, players.selection(), edits.pending(), lastEditWasTransfer ? null : edits.status(),
-                popupOpen());
+        access.draw(graphics, players.selection(), lastEditWasTransfer ? null : edits.status(), popupOpen());
     }
 
     @Override
