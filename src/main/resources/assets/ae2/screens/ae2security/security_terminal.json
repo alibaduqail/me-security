@@ -1,0 +1,75 @@
+{
+  "$schema": "../schema.json",
+  "$comment": "ME Security Terminal. AE2's StyleManager only loads styles from the ae2 namespace, so this lives in its own ae2security folder there. Everything below reuses AE2's own textures, and the palette comes from AE2's common.json, so resource packs that restyle AE2 restyle this screen too.",
+  "includes": ["../common/common.json"],
+  "generatedBackground": {
+    "width": 282,
+    "height": 190
+  },
+  "images": {
+    "well": {
+      "$comment": "The inset track beside the crafting CPU list: a white frame with a shaded top edge.",
+      "texture": "guis/cpu_selector.png",
+      "srcRect": [80, 18, 6, 139]
+    },
+    "row": {
+      "texture": "guis/cpu_selector.png",
+      "srcRect": [100, 0, 67, 22]
+    },
+    "rowSelected": {
+      "texture": "guis/cpu_selector.png",
+      "srcRect": [100, 22, 67, 22]
+    },
+    "switchOff": {
+      "texture": "guis/checkbox.png",
+      "textureWidth": 64,
+      "textureHeight": 64,
+      "srcRect": [0, 28, 22, 12]
+    },
+    "switchOffHover": {
+      "texture": "guis/checkbox.png",
+      "textureWidth": 64,
+      "textureHeight": 64,
+      "srcRect": [22, 28, 22, 12]
+    },
+    "switchOn": {
+      "texture": "guis/checkbox.png",
+      "textureWidth": 64,
+      "textureHeight": 64,
+      "srcRect": [0, 40, 22, 12]
+    },
+    "switchOnHover": {
+      "texture": "guis/checkbox.png",
+      "textureWidth": 64,
+      "textureHeight": 64,
+      "srcRect": [22, 40, 22, 12]
+    }
+  },
+  "widgets": {
+    "search": {
+      "left": 7,
+      "top": 28,
+      "width": 135,
+      "height": 12
+    },
+    "playerList": {
+      "$comment": "Six 20px rows (one server page), 1px apart, inside a 1px frame.",
+      "left": 7,
+      "top": 43,
+      "width": 124,
+      "height": 127
+    },
+    "playerScrollbar": {
+      "left": 133,
+      "top": 43,
+      "width": 9,
+      "height": 127
+    },
+    "details": {
+      "left": 150,
+      "top": 28,
+      "width": 124,
+      "height": 142
+    }
+  }
+}
