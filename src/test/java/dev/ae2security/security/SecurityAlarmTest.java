@@ -44,6 +44,12 @@ class SecurityAlarmTest {
         SecurityAlarm.forgetReports();
     }
 
+    @Test void vanillaDimensionsAreNamedShortlyInAlerts() {
+        assertEquals("overworld", SecurityAlarm.dimensionName("minecraft:overworld"));
+        assertEquals("the_nether", SecurityAlarm.dimensionName("minecraft:the_nether"));
+        assertEquals("twilightforest:twilight_forest", SecurityAlarm.dimensionName("twilightforest:twilight_forest"));
+    }
+
     @Test void anEmitterWatchesStrangersUnlessSetToEveryone() {
         assertEquals(EmitterTrigger.STRANGERS, EmitterTrigger.DEFAULT);
         assertTrue(EmitterTrigger.STRANGERS.reactsTo(true));

@@ -14,7 +14,7 @@
   "message.ae2security.owner_only": "Only this security terminal's owner can manage access.",
   "message.ae2security.transferred": "ME network ownership transferred to %s.",
   "message.ae2security.transfer_name_mismatch": "Ownership was not transferred. Type %s's name to confirm.",
-  "message.ae2security.alarm.live": "Intruder: %s was denied %s on your ME network (terminal at %s)",
+  "message.ae2security.alarm.live": "Intruder: %s denied %s at %s",
   "message.ae2security.alarm.location": "%s, %s, %s in %s",
   "message.ae2security.alarm.location_unknown": "an unknown location",
   "permission.ae2security.view": "View",

@@ -178,9 +178,15 @@ public final class SecurityAlarm {
                 location(where)).withStyle(ChatFormatting.YELLOW);
     }
 
+    /** The Security Terminal's position, kept short enough for the action bar. */
     private static Component location(TerminalLocation where) {
         if (where == null) return Component.translatable("message.ae2security.alarm.location_unknown");
         return Component.translatable("message.ae2security.alarm.location", where.pos().getX(), where.pos().getY(),
-                where.pos().getZ(), where.dimension());
+                where.pos().getZ(), dimensionName(where.dimension()));
+    }
+
+    /** A vanilla dimension by its path ("overworld"), any other by its full id. */
+    static String dimensionName(String dimension) {
+        return dimension.startsWith("minecraft:") ? dimension.substring("minecraft:".length()) : dimension;
     }
 }
