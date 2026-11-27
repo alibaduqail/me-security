@@ -1,0 +1,152 @@
+name: Release
+
+# Pushing a tag such as v1.2.3 builds that commit and publishes it to GitHub Releases,
+# Modrinth and CurseForge. The tag must match mod_version in gradle.properties, the
+# tagged commit must be on main, and CHANGELOG.md must have a "## 1.2.3" section.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+# Never cancel a release halfway through publishing.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - name: Check publishing tokens
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+        run: |
+          # mc-publish quietly skips a platform whose token is empty, so stop here instead.
+          missing=0
+          for name in MODRINTH_TOKEN CURSEFORGE_TOKEN; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Repository secret $name is not set."
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Check tag, version and changelog
+        id: version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          mod_version="$(sed -n 's/^mod_version=//p' gradle.properties)"
+          ae2_version="$(sed -n 's/^ae2_version=//p' gradle.properties)"
+
+          if [ "$version" != "$mod_version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match mod_version=$mod_version in gradle.properties."
+            exit 1
+          fi
+
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Tag $GITHUB_REF_NAME points at a commit that is not on main."
+            exit 1
+          fi
+
+          # The "## <version>" section of CHANGELOG.md, up to the next "## " heading,
+          # without the heading and without leading or trailing blank lines.
+          mkdir -p build
+          awk -v v="$version" '
+            /^## / { if (found) exit; found = ($2 == v); next }
+            found { lines[++n] = $0 }
+            END {
+              first = 1; while (first <= n && lines[first] ~ /^[[:space:]]*$/) first++
+              last = n; while (last >= first && lines[last] ~ /^[[:space:]]*$/) last--
+              for (i = first; i <= last; i++) print lines[i]
+            }
+          ' CHANGELOG.md > build/changelog.md
+
+          if [ ! -s build/changelog.md ]; then
+            echo "::error::CHANGELOG.md has no \"## $version\" section."
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "ae2_version=$ae2_version" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      # Also validates the Gradle wrapper jar against Gradle's published checksums.
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Build
+        run: ./gradlew build --stacktrace
+
+      - name: Write GitHub release notes
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          AE2_VERSION: ${{ steps.version.outputs.ae2_version }}
+        run: |
+          jar="ae2security-$VERSION.jar"
+          sources="ae2security-$VERSION-sources.jar"
+          for file in "$jar" "$sources"; do
+            if [ ! -f "build/libs/$file" ]; then
+              echo "::error::build/libs/$file was not built."
+              exit 1
+            fi
+          done
+          sha256="$(sha256sum "build/libs/$jar" | cut -d ' ' -f 1)"
+
+          {
+            cat build/changelog.md
+            echo
+            echo '### Files'
+            echo
+            echo "- \`$jar\`: the mod. Install it on both client and server, with AE2 $AE2_VERSION."
+            echo "- \`$sources\`: the source code."
+            echo "- SHA-256 (\`$jar\`): \`$sha256\`"
+          } > build/github-release-notes.md
+
+          cat build/github-release-notes.md
+
+      - name: Publish to Modrinth, CurseForge and GitHub
+        uses: Kir-Antipov/mc-publish@v3.3.2
+        with:
+          modrinth-id: f8CLe1eE
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          modrinth-featured: false
+          modrinth-files: build/libs/ae2security-${{ steps.version.outputs.version }}.jar
+
+          curseforge-id: 1833375
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          curseforge-files: build/libs/ae2security-${{ steps.version.outputs.version }}.jar
+
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-name: ME Security ${{ steps.version.outputs.version }}
+          github-changelog-file: build/github-release-notes.md
+          github-files: |
+            build/libs/ae2security-${{ steps.version.outputs.version }}.jar
+            build/libs/ae2security-${{ steps.version.outputs.version }}-sources.jar
+
+          name: ME Security Terminal ${{ steps.version.outputs.version }}
+          version: ${{ steps.version.outputs.version }}
+          changelog-file: build/changelog.md
+          loaders: neoforge
+          game-versions: 1.21.1
+          java: 21
+          environment: client | server
+          dependencies: |
+            ae2(required){modrinth:XxWD5pD3}{curseforge:223794}
+            guideme(required){modrinth:Ck4E7v7R}{curseforge:1173950}
+            ae2wtlib(optional){modrinth:pNabrMMw}{curseforge:304024}
