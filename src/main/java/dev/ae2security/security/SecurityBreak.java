@@ -56,6 +56,7 @@ public final class SecurityBreak {
         for (var part : parts(host)) {
             if (part instanceof SecurityTerminalPart terminal && !retired(terminal, player)
                     && !isTerminalOwner(terminal, player) && !SecurityAccess.bypassing(player)) {
+                SecurityAlarm.denied(terminal, player, Permission.BUILD);
                 SecurityAccess.notice(player, Component.translatable("message.ae2security.terminal_break_owner"));
                 return false;
             }
@@ -65,6 +66,7 @@ public final class SecurityBreak {
 
     private static boolean allowTerminalRemoval(SecurityTerminalPart terminal, Player player) {
         if (isTerminalOwner(terminal, player) || SecurityAccess.bypassing(player)) return true;
+        SecurityAlarm.denied(terminal, player, Permission.BUILD);
         SecurityAccess.notice(player, Component.translatable("message.ae2security.terminal_break_owner"));
         return false;
     }

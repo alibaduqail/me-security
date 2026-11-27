@@ -1,0 +1,6 @@
+{
+  "parent": "ae2:item/level_emitter",
+  "textures": {
+    "emitter": "ae2security:part/security_emitter"
+  }
+}

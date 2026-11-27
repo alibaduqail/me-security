@@ -5,6 +5,7 @@ import appeng.menu.SlotSemantics;
 import appeng.menu.slot.AppEngSlot;
 import appeng.menu.slot.RestrictedInputSlot;
 import appeng.parts.reporting.AbstractTerminalPart;
+import dev.ae2security.security.SecurityAlarm;
 import dev.ae2security.security.SecurityHardware;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -22,6 +23,9 @@ public abstract class RestrictedInputSlotMixin extends AppEngSlot {
         var menu = getMenu();
         if (menu != null && !menu.isClientSide() && menu.getSlotSemantic(this) == SlotSemantics.VIEW_CELL
                 && menu.getTarget() instanceof AbstractTerminalPart part
-                && !SecurityHardware.allowBuild(part, menu.getPlayer())) callback.setReturnValue(false);
+                // Slot checks also run while shift-clicking other items, so a refusal here raises no alarm.
+                && !SecurityAlarm.quietly(() -> SecurityHardware.allowBuild(part, menu.getPlayer()))) {
+            callback.setReturnValue(false);
+        }
     }
 }

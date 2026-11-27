@@ -92,6 +92,7 @@ public final class SecurityAccess {
 
     public static boolean allow(IGrid grid, Player player, Permission permission, boolean ownerOnly) {
         var decision = check(grid, player, permission, ownerOnly);
+        if (decision == AccessDecision.DENIED) SecurityAlarm.denied(grid, player, permission);
         if (decision != AccessDecision.ALLOW) notice(player, decision);
         return decision == AccessDecision.ALLOW;
     }
@@ -186,6 +187,7 @@ public final class SecurityAccess {
             long available = SecuritySavedData.get(serverPlayer.server).craftedAmount(terminal, player.getUUID(), key);
             if (available > 0) return Math.min(amount, available);
         }
+        if (decision == AccessDecision.DENIED) SecurityAlarm.denied(grid, player, Permission.EXTRACT);
         notice(player, decision);
         return 0;
     }
@@ -242,10 +244,11 @@ public final class SecurityAccess {
                 && player.distanceToSqr(pos.getX() + .5, pos.getY() + .5, pos.getZ() + .5) <= 64;
     }
 
+    /** Re-validates an open menu, as often as every tick; only {@link #opening} is an attempt to get in. */
     public static boolean menu(AEBaseMenu menu) {
         if (menu.isClientSide()) return true;
         var type = BuiltInRegistries.MENU.getKey(menu.getType());
-        boolean allowed = opening(menu.getPlayer(), menu.getTarget(), type);
+        boolean allowed = SecurityAlarm.quietly(() -> opening(menu.getPlayer(), menu.getTarget(), type));
         if (!allowed) menu.setValidMenu(false);
         return allowed;
     }
@@ -262,7 +265,8 @@ public final class SecurityAccess {
 
     public static boolean craftMenu(AEBaseMenu menu) {
         if (menu.isClientSide()) return true;
-        return menu(menu) && allow(grid(menu.getTarget()), menu.getPlayer(), Permission.CRAFT, false);
+        return menu(menu) && SecurityAlarm.quietly(
+                () -> allow(grid(menu.getTarget()), menu.getPlayer(), Permission.CRAFT, false));
     }
 
     public static void policyChanged(MinecraftServer server, UUID terminal, SecurityPolicy before, SecurityPolicy after) {
@@ -273,7 +277,9 @@ public final class SecurityAccess {
                     var type = BuiltInRegistries.MENU.getKey(menu.getType());
                     boolean lostPermission = MenuAccess.of(type).lostRelevant(before.permissions(player.getUUID()),
                             after.permissions(player.getUUID()));
-                    if (lostPermission || !opening(player, menu.getTarget(), type)) player.closeContainer();
+                    if (lostPermission || !SecurityAlarm.quietly(() -> opening(player, menu.getTarget(), type))) {
+                        player.closeContainer();
+                    }
                 }
             }
         }

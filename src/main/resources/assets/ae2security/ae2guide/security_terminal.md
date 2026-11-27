@@ -94,6 +94,16 @@ guide button on the left of the screen. Type that player's name in the confirmat
 window, then click **Confirm**, or **Cancel** to back out. Other trusted entries
 stay in place. The previous owner loses access unless the new owner trusts them afterward.
 
+## Intrusion alarm
+
+The terminal notices when a player you have not trusted is denied on your network,
+whether they tried to open a terminal, take items, build, or break something. A
+trusted player who only lacks one permission is never reported.
+
+To hear about it, put an [Intrusion Alert Card](intrusion_alert_card.md) in a wireless
+terminal linked to the network and carry it. For a redstone signal, add a
+[Security Emitter](security_emitter.md) to the network.
+
 ## Wireless access and automation
 
 Wireless terminals still use AE2's normal pairing, range, and quantum-link rules.

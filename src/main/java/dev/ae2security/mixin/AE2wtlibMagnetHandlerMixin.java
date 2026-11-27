@@ -6,6 +6,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import dev.ae2security.security.AE2wtlibSecurityPatched;
 import dev.ae2security.security.Permission;
 import dev.ae2security.security.SecurityAccess;
+import dev.ae2security.security.SecurityAlarm;
 import net.minecraft.server.level.ServerPlayer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
@@ -26,6 +27,8 @@ public abstract class AE2wtlibMagnetHandlerMixin implements AE2wtlibSecurityPatc
     private static IGrid ae2security$authorizeInventorySync(@Coerce Object handler, Operation<IGrid> original,
             ServerPlayer player) {
         var grid = original.call(handler);
-        return grid != null && SecurityAccess.allow(grid, player, Permission.VIEW, false) ? grid : null;
+        // The sync runs by itself for anyone carrying a linked terminal; it is not an attempt to get in.
+        return grid != null && SecurityAlarm.quietly(() -> SecurityAccess.allow(grid, player, Permission.VIEW, false))
+                ? grid : null;
     }
 }

@@ -10,6 +10,7 @@
     "ae2:patternterm",
     "ae2:quartzknife",
     "ae2:skychest",
+    "ae2security:security_emitter",
     { "id": "ae2wtlib:wireless_pattern_encoding_terminal", "required": false },
     { "id": "ae2wtlib:wireless_pattern_access_terminal", "required": false }
   ]

@@ -180,7 +180,7 @@ public final class SecuritySavedData extends SavedData {
                 && (ownerChanged && claim.player().equals(previous.owner()) || !hasStanding(current, claim.player())));
     }
 
-    private static boolean hasStanding(SecurityPolicy policy, UUID player) {
+    static boolean hasStanding(SecurityPolicy policy, UUID player) {
         return policy.isOwner(player) || policy.trusted().containsKey(player);
     }
 

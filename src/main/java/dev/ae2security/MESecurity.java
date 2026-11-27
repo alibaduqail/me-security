@@ -2,11 +2,16 @@ package dev.ae2security;
 
 import appeng.api.networking.GridServices;
 import appeng.api.parts.PartModels;
+import appeng.api.upgrades.Upgrades;
 import dev.ae2security.gametest.SecurityGameTests;
 import dev.ae2security.gametest.HardwareGameTests;
 import dev.ae2security.integration.SecurityTerminalTooltip;
+import dev.ae2security.menu.SecurityEmitterMenu;
 import dev.ae2security.menu.SecurityMenu;
 import dev.ae2security.network.SecurityPayloads;
+import appeng.items.parts.PartItem;
+import appeng.menu.implementations.MenuTypeBuilder;
+import dev.ae2security.part.SecurityEmitterPart;
 import dev.ae2security.part.SecurityTerminalItem;
 import dev.ae2security.part.SecurityTerminalPart;
 import dev.ae2security.security.*;
@@ -39,12 +44,21 @@ public final class MESecurity {
     public static final DeferredHolder<MenuType<?>, MenuType<SecurityMenu>> SECURITY_MENU = MENUS.register("security_terminal", () ->
             IMenuTypeExtension.create((id, inventory, data) ->
                     new SecurityMenu(id, inventory, data.readBlockPos(), data.readEnum(net.minecraft.core.Direction.class))));
+    public static final DeferredItem<PartItem<SecurityEmitterPart>> EMITTER_ITEM = ITEMS.register("security_emitter", () ->
+            new PartItem<>(new Item.Properties(), SecurityEmitterPart.class, SecurityEmitterPart::new));
+    public static final DeferredHolder<MenuType<?>, MenuType<SecurityEmitterMenu>> EMITTER_MENU = MENUS.register("security_emitter", () ->
+            MenuTypeBuilder.create(SecurityEmitterMenu::new, SecurityEmitterPart.class).buildUnregistered(id("security_emitter")));
+    /** Goes in a wireless terminal; its carrier is told when a stranger is denied on the linked network. */
+    public static final DeferredItem<Item> ALERT_CARD = ITEMS.register("intrusion_alert_card", () ->
+            Upgrades.createUpgradeCardItem(new Item.Properties()));
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> CREATIVE_TAB =
             CREATIVE_TABS.register("main", () -> CreativeModeTab.builder()
                     .title(Component.translatable("itemGroup.ae2security"))
                     .icon(() -> TERMINAL_ITEM.get().getDefaultInstance())
                     .displayItems((parameters, output) -> {
                         output.accept(TERMINAL_ITEM.get());
+                        output.accept(EMITTER_ITEM.get());
+                        output.accept(ALERT_CARD.get());
                     })
                     .build());
 
@@ -52,7 +66,8 @@ public final class MESecurity {
         ITEMS.register(bus);
         MENUS.register(bus);
         CREATIVE_TABS.register(bus);
-        PartModels.registerModels(SecurityTerminalPart.MODEL_OFF, SecurityTerminalPart.MODEL_ON);
+        PartModels.registerModels(SecurityTerminalPart.MODEL_OFF, SecurityTerminalPart.MODEL_ON,
+                SecurityEmitterPart.MODEL_BASE_OFF, SecurityEmitterPart.MODEL_BASE_ON);
         SecurityTerminalTooltip.register();
         bus.addListener(this::setup);
         bus.addListener(SecurityPayloads::register);
@@ -62,6 +77,7 @@ public final class MESecurity {
         NeoForge.EVENT_BUS.addListener(this::protectHardwareFromExplosions);
         NeoForge.EVENT_BUS.addListener(SecurityWorldEvents::livingDestroy);
         SecurityCommands.register(NeoForge.EVENT_BUS);
+        SecurityAlarm.register(NeoForge.EVENT_BUS);
         NeoForge.EVENT_BUS.addListener(net.neoforged.bus.api.EventPriority.HIGHEST, SecurityHardware::toolUse);
     }
 
@@ -70,6 +86,7 @@ public final class MESecurity {
         event.enqueueWork(() -> {
             GridServices.register(ISecurityGrid.class, SecurityGridService.class);
             SecurityWorldEvents.registerGridEvents();
+            IntrusionAlerts.registerCard();
         });
     }
     private void gameTests(RegisterGameTestsEvent event) {

@@ -11,6 +11,8 @@ import appeng.parts.reporting.AbstractDisplayPart;
 import dev.ae2security.MESecurity;
 import dev.ae2security.menu.SecurityMenu;
 import dev.ae2security.security.ISecurityGrid;
+import dev.ae2security.security.Permission;
+import dev.ae2security.security.SecurityAlarm;
 import dev.ae2security.security.SecurityGridService;
 import dev.ae2security.security.SecurityPolicy;
 import dev.ae2security.security.SecuritySavedData;
@@ -245,6 +247,8 @@ public final class SecurityTerminalPart extends AbstractDisplayPart implements M
                     data.writeEnum(getSide());
                 });
             } else {
+                // Trusted players are told the same; only a stranger alerts the owner, but emitters may watch everyone.
+                SecurityAlarm.denied(this, player, Permission.VIEW);
                 player.displayClientMessage(Component.translatable("message.ae2security.owner_only"), true);
             }
         }

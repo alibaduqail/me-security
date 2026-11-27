@@ -48,6 +48,27 @@ Only one Security Terminal may be attached to a connected grid. Normal player pl
 
 With Jade or WTHIT installed, looking at a Security Terminal shows its owner's name to every player, and below it your own access: Owner, the permissions you have been granted, or None. A network with conflicting terminals or an unresolved policy says that access is blocked. The tooltip uses AE2's built-in tooltip support, so neither mod is a dependency.
 
+### Intrusion alarm
+
+The terminal notices when a player you have not trusted is denied on its network: opening a terminal or device, moving items, building on it or breaking it, tampering with the Security Terminal itself, or a wireless terminal that is still linked. A trusted player who merely lacks one permission is never reported, and neither is an operator using the admin bypass. Nothing is raised while conflicting terminals block the network for everyone, or for checks the player did not start, such as AE2 rechecking an open screen.
+
+Each report is written to the server log, limited to one per intruder and terminal each minute. Players hear about it through an Intrusion Alert Card, and redstone through a Security Emitter.
+
+### Intrusion Alert Card
+
+An upgrade card (an advanced card and a wireless receiver) for AE2's wireless and wireless crafting terminals, and for AE2 Wireless Terminals' terminals when that mod is installed. One card per terminal. The network's owner and every trusted player who is online with a carded terminal in their inventory or offhand, linked to a wireless access point on the network, is told of each report: a line above the hotbar naming the player, the permission they were denied and the Security Terminal's position, with a ping only they hear. Range and dimension do not matter, the network's chunks need not be loaded, and the terminal uses no power for it. Alerts are live only: nothing is kept for players who are offline or not carrying a card. Remove the card to stop them.
+
+### Security Emitter
+
+The ME Security Emitter is a level-emitter-style cable part (crafted from a level emitter and an engineering processor) that emits a two-tick redstone pulse, like an observer's, when an action is denied on its network; every denial gives its own pulse. What the signal drives is up to the player. Like a level emitter, it powers the block in front of it, needs a powered network and uses no channel. Its screen, which only the network's owner can open, has two settings:
+
+| Setting | Options |
+|---|---|
+| Triggered by | **Strangers** (default): only players who are neither the owner nor trusted. **Everyone**: anyone who is denied, including a trusted player using a permission they do not have. |
+| Redstone output | **Pulse** (default), or **Inverted pulse**, which emits all the time and stops for two ticks on a denial. |
+
+An emitter works independently of Intrusion Alert Cards and follows the same rules about what counts as a denial. Anyone who can touch the network can trigger it, so connect only what a stranger may set off. Players with Build can remove it like any other network hardware.
+
 Wireless terminals still require normal AE2 access-point pairing and range or quantum-link conditions. A paired item does not grant ME Security permissions.
 
 Only its owner can dismantle a Security Terminal or break the cable-bus block containing it, regardless of Build permission (operators can use the recovery commands under Administration). Removing it retires its policy and drops a fresh, unbound part item. A terminal copied with its block data (structure templates, `/clone`, creative pick-block, or world editors) receives its own identity with the original's owner and trusted players once the original is found still in place, and removing such a copy never retires the original's policy; Spatial IO and other movers that vacate the old location keep the identity. A copy that is never loaded together with its original cannot be told apart from a move and keeps sharing the policy until both are loaded. Policy identities and conservative topology associations survive chunk unloads and server restarts without chunk loading. Power loss and channel exhaustion do not turn protection off.
@@ -82,6 +103,6 @@ A terminal placed with no owning player, such as by an automated placer that has
 
 ME Security controls player access through supported AE2 and AE2 Wireless Terminals menus, network storage transactions, crafting requests, crafting controls, and wireless restock inventory synchronization. Machine automation has no player principal and continues normally. Jobs already accepted by a crafting CPU continue after the initiating player's access changes.
 
-Hardware protection applies to native AE2 network devices and to add-on blocks that host AE2 grid nodes, and follows actual network connections, including conservative protection during unresolved topology. Add-on menus that the tags above do not classify require Build; add-on pattern-management screens become owner-only only when a pack adds them to `owner_menus`. Hopper and bus protection for storage-cell slots covers add-on devices only when they extend AE2's drive, ME Chest, IO Port, Spatial IO Port, or quantum bridge. It does not protect arbitrary third-party movers or tools, vanilla and third-party world-editing commands such as `/setblock` or WorldEdit, external inventories, or machine outputs. The only administrative commands the mod provides are the `/mesecurity` recovery commands below; it does not provide land claims, access history, or lockdown controls.
+Hardware protection applies to native AE2 network devices and to add-on blocks that host AE2 grid nodes, and follows actual network connections, including conservative protection during unresolved topology. Add-on menus that the tags above do not classify require Build; add-on pattern-management screens become owner-only only when a pack adds them to `owner_menus`. Hopper and bus protection for storage-cell slots covers add-on devices only when they extend AE2's drive, ME Chest, IO Port, Spatial IO Port, or quantum bridge. It does not protect arbitrary third-party movers or tools, vanilla and third-party world-editing commands such as `/setblock` or WorldEdit, external inventories, or machine outputs. The only administrative commands the mod provides are the `/mesecurity` recovery commands below; it does not provide land claims, an access history beyond the intrusion alarm, or lockdown controls.
 
 Compatibility is limited to the versions in the table; AE2 and AE2 Wireless Terminals must match exactly. Adding another terminal mod or changing an existing menu or packet path requires an explicit integration review; unknown integrations are not claimed to be protected.
