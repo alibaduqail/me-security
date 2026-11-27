@@ -3,22 +3,20 @@ package dev.ae2security.security;
 import java.util.Locale;
 
 /**
- * What a Security Terminal does when a player with no standing on its network is denied.
- * The names are saved and the order is sent over the network: never rename or reorder these values.
+ * Whether a Security Terminal tells its owner when a player with no standing on its network is denied.
+ * Redstone output is a separate part, the Security Emitter. The names are saved and the order is sent
+ * over the network: never rename or reorder these values.
  */
 public enum AlarmMode {
     /** Nothing: denied attempts are neither reported nor signalled. */
     OFF,
     /** The owner is told, at once when online and otherwise at their next login. */
-    ALERT,
-    /** As {@link #ALERT}, and the terminal's block emits a redstone pulse. */
-    REDSTONE;
+    ALERT;
 
-    /** Alerts cost the owner nothing; redstone can drive machines, so the owner switches it on deliberately. */
+    /** Alerts cost the owner nothing, so existing and new terminals start with them on. */
     public static final AlarmMode DEFAULT = ALERT;
 
     public boolean alerts() { return this != OFF; }
-    public boolean redstone() { return this == REDSTONE; }
 
     /** The mode the owner's toolbar button switches to next. */
     public AlarmMode next() {

@@ -126,15 +126,6 @@ public final class SecurityGridService implements ISecurityGrid, IGridServicePro
         return ((SecurityTerminalPart) terminalNode.getOwner()).terminalId();
     }
 
-    /** The loaded terminal on this grid that carries the identity, or null when it is only known from hints. */
-    public SecurityTerminalPart terminal(UUID id) {
-        for (int i = 0; i < terminalNodes.size(); i++) {
-            var terminal = (SecurityTerminalPart) terminalNodes.get(i).getOwner();
-            if (terminal.terminalId().equals(id)) return terminal;
-        }
-        return null;
-    }
-
     private Set<UUID> connectedTerminals() {
         var ids = new HashSet<UUID>();
         for (int i = 0; i < terminalNodes.size(); i++) ids.add(terminalId(terminalNodes.get(i)));

@@ -66,8 +66,23 @@ class SecurityAlarmTest {
         assertEquals(java.util.EnumSet.allOf(AlarmMode.class), seen);
         assertEquals(AlarmMode.DEFAULT, mode, "the button comes back round to where it started");
         assertNull(AlarmMode.byId("siren"));
-        assertTrue(AlarmMode.ALERT.alerts() && !AlarmMode.ALERT.redstone());
-        assertTrue(AlarmMode.REDSTONE.alerts() && AlarmMode.REDSTONE.redstone());
-        assertFalse(AlarmMode.OFF.alerts() || AlarmMode.OFF.redstone());
+        assertNull(AlarmMode.byId("redstone"), "redstone output moved to the Security Emitter");
+        assertTrue(AlarmMode.ALERT.alerts());
+        assertFalse(AlarmMode.OFF.alerts());
+    }
+
+    @Test void anEmitterWatchesStrangersUnlessSetToEveryone() {
+        assertEquals(EmitterTrigger.STRANGERS, EmitterTrigger.DEFAULT);
+        assertTrue(EmitterTrigger.STRANGERS.reactsTo(true));
+        assertFalse(EmitterTrigger.STRANGERS.reactsTo(false), "a trusted player lacking a permission is not a stranger");
+        assertTrue(EmitterTrigger.EVERYONE.reactsTo(true));
+        assertTrue(EmitterTrigger.EVERYONE.reactsTo(false));
+        for (var trigger : EmitterTrigger.values()) {
+            assertEquals(trigger, EmitterTrigger.byId(trigger.id()));
+            assertNotEquals(trigger, trigger.next());
+            assertEquals(trigger, trigger.next().next());
+        }
+        assertEquals(EmitterTrigger.DEFAULT, EmitterTrigger.byId(""), "a part saved before the setting existed");
+        assertEquals(EmitterTrigger.DEFAULT, EmitterTrigger.byId("nobody"));
     }
 }

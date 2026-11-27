@@ -1,0 +1,9 @@
+{
+  "type":"minecraft:crafting_shapeless",
+  "category":"misc",
+  "ingredients":[
+    {"item":"ae2:level_emitter"},
+    {"item":"ae2:engineering_processor"}
+  ],
+  "result":{"id":"ae2security:security_emitter","count":1}
+}

@@ -1,6 +1,7 @@
 package dev.ae2security.client;
 
 import appeng.api.util.AEColor;
+import appeng.init.client.InitScreens;
 import dev.ae2security.MESecurity;
 import net.minecraft.util.FastColor;
 import net.neoforged.api.distmarker.Dist;
@@ -14,6 +15,8 @@ public final class ClientSetup {
     private ClientSetup() {}
     @SubscribeEvent public static void screens(RegisterMenuScreensEvent event) {
         event.register(MESecurity.SECURITY_MENU.get(), SecurityScreen::new);
+        InitScreens.register(event, MESecurity.EMITTER_MENU.get(), SecurityEmitterScreen::new,
+                "/screens/ae2security/security_emitter.json");
     }
 
     @SubscribeEvent public static void itemColors(RegisterColorHandlersEvent.Item event) {

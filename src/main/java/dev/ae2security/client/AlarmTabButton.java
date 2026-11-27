@@ -16,13 +16,12 @@ final class AlarmTabButton extends IconButton {
         this.mode = mode;
     }
 
-    /** A crossed-out circle for off, an unlit torch for alerts only and a lit one once redstone is on. */
+    /** A crossed-out circle when alerts are off and a tick when they are on. */
     @Override
     protected Icon getIcon() {
         return switch (mode) {
             case OFF -> Icon.INVALID;
-            case ALERT -> Icon.REDSTONE_OFF;
-            case REDSTONE -> Icon.REDSTONE_ON;
+            case ALERT -> Icon.VALID;
         };
     }
 }

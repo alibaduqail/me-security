@@ -5,8 +5,12 @@ import appeng.api.parts.PartModels;
 import dev.ae2security.gametest.SecurityGameTests;
 import dev.ae2security.gametest.HardwareGameTests;
 import dev.ae2security.integration.SecurityTerminalTooltip;
+import dev.ae2security.menu.SecurityEmitterMenu;
 import dev.ae2security.menu.SecurityMenu;
 import dev.ae2security.network.SecurityPayloads;
+import appeng.items.parts.PartItem;
+import appeng.menu.implementations.MenuTypeBuilder;
+import dev.ae2security.part.SecurityEmitterPart;
 import dev.ae2security.part.SecurityTerminalItem;
 import dev.ae2security.part.SecurityTerminalPart;
 import dev.ae2security.security.*;
@@ -39,12 +43,17 @@ public final class MESecurity {
     public static final DeferredHolder<MenuType<?>, MenuType<SecurityMenu>> SECURITY_MENU = MENUS.register("security_terminal", () ->
             IMenuTypeExtension.create((id, inventory, data) ->
                     new SecurityMenu(id, inventory, data.readBlockPos(), data.readEnum(net.minecraft.core.Direction.class))));
+    public static final DeferredItem<PartItem<SecurityEmitterPart>> EMITTER_ITEM = ITEMS.register("security_emitter", () ->
+            new PartItem<>(new Item.Properties(), SecurityEmitterPart.class, SecurityEmitterPart::new));
+    public static final DeferredHolder<MenuType<?>, MenuType<SecurityEmitterMenu>> EMITTER_MENU = MENUS.register("security_emitter", () ->
+            MenuTypeBuilder.create(SecurityEmitterMenu::new, SecurityEmitterPart.class).buildUnregistered(id("security_emitter")));
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> CREATIVE_TAB =
             CREATIVE_TABS.register("main", () -> CreativeModeTab.builder()
                     .title(Component.translatable("itemGroup.ae2security"))
                     .icon(() -> TERMINAL_ITEM.get().getDefaultInstance())
                     .displayItems((parameters, output) -> {
                         output.accept(TERMINAL_ITEM.get());
+                        output.accept(EMITTER_ITEM.get());
                     })
                     .build());
 
@@ -52,7 +61,8 @@ public final class MESecurity {
         ITEMS.register(bus);
         MENUS.register(bus);
         CREATIVE_TABS.register(bus);
-        PartModels.registerModels(SecurityTerminalPart.MODEL_OFF, SecurityTerminalPart.MODEL_ON);
+        PartModels.registerModels(SecurityTerminalPart.MODEL_OFF, SecurityTerminalPart.MODEL_ON,
+                SecurityEmitterPart.MODEL_BASE_OFF, SecurityEmitterPart.MODEL_BASE_ON);
         SecurityTerminalTooltip.register();
         bus.addListener(this::setup);
         bus.addListener(SecurityPayloads::register);

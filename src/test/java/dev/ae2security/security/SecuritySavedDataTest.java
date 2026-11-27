@@ -341,7 +341,7 @@ class SecuritySavedDataTest {
         data.create(armed, owner);
         data.create(untouched, owner);
         assertEquals(AlarmMode.DEFAULT, data.alarmMode(armed));
-        data.setAlarmMode(armed, AlarmMode.REDSTONE);
+        data.setAlarmMode(armed, AlarmMode.OFF);
         data.recordAlarm(armed, intruder, "Intruder", 1_000L);
         data.recordAlarm(armed, intruder, "Intruder", 2_000L);
 
@@ -353,7 +353,7 @@ class SecuritySavedDataTest {
             assertEquals(isArmed, row.contains("alarmPending"));
         }
         var restored = SecuritySavedData.load(saved, RegistryAccess.EMPTY);
-        assertEquals(AlarmMode.REDSTONE, restored.alarmMode(armed));
+        assertEquals(AlarmMode.OFF, restored.alarmMode(armed));
         assertEquals(AlarmMode.DEFAULT, restored.alarmMode(untouched));
         assertEquals(saved, restored.save(new CompoundTag(), RegistryAccess.EMPTY));
         assertEquals(java.util.Map.of(armed, java.util.List.of(new AlarmLog.Entry(intruder, "Intruder", 2, 2_000L))),

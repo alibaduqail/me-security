@@ -87,15 +87,17 @@ class MenuAccessTest {
                 } else {
                     id = value.getAsString();
                 }
-                assertTrue(id.startsWith("ae2:") || id.startsWith("ae2wtlib:"), id);
-                // ae2 is a hard dependency; any other mod must be an optional entry or the whole tag fails to load.
-                assertEquals(id.startsWith("ae2:"), value.isJsonPrimitive(), id + " optionality");
+                assertTrue(id.startsWith("ae2:") || id.startsWith("ae2wtlib:") || id.startsWith("ae2security:"), id);
+                // ae2 and this mod are always present; any other mod must be an optional entry or the whole tag fails to load.
+                assertEquals(!id.startsWith("ae2wtlib:"), value.isJsonPrimitive(), id + " optionality");
                 assertTrue(seen.add(id), id + " is classified twice");
                 entries++;
             }
         }
-        // 36 of AE2's 40 menu types (the four crafting screens are matched in code) plus five ae2wtlib menus.
-        assertEquals(41, entries);
+        // 36 of AE2's 40 menu types (the four crafting screens are matched in code), five ae2wtlib menus
+        // and the Security Emitter's settings.
+        assertEquals(42, entries);
+        assertTrue(seen.contains("ae2security:security_emitter"), "only the owner configures a Security Emitter");
         assertTrue(seen.containsAll(Set.of("ae2:pattern_provider", "ae2:patternterm", "ae2:patternaccessterminal",
                 "ae2wtlib:wireless_pattern_encoding_terminal", "ae2wtlib:wireless_pattern_access_terminal")));
     }

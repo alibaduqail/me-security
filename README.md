@@ -50,15 +50,20 @@ With Jade or WTHIT installed, looking at a Security Terminal shows its owner's n
 
 ### Intrusion alarm
 
-The terminal notices when a player you have not trusted is denied on its network: opening a terminal or device, moving items, building on it or breaking it, tampering with the Security Terminal itself, or a wireless terminal that is still linked. A trusted player who merely lacks one permission never raises the alarm, and neither does an operator using the admin bypass. Nothing is raised while conflicting terminals block the network for everyone. The alarm button in the screen's left toolbar, under the transfer arrow, switches between three modes:
+The terminal notices when a player you have not trusted is denied on its network: opening a terminal or device, moving items, building on it or breaking it, tampering with the Security Terminal itself, or a wireless terminal that is still linked. A trusted player who merely lacks one permission is never reported, and neither is an operator using the admin bypass. Nothing is raised while conflicting terminals block the network for everyone, or for checks the player did not start, such as AE2 rechecking an open screen.
 
-| Mode | Effect |
+The alarm button in the screen's left toolbar, under the transfer arrow, switches owner alerts between **Off** and **Alert** (the default). With Alert, the owner gets a chat message naming the player, the permission they were denied and the terminal's position; an owner who is offline gets one summary per terminal at their next login. Reports are limited to one per intruder and terminal each minute, and each is also written to the server log. The login summary keeps at most 16 intruders per terminal and is cleared once shown.
+
+### Security Emitter
+
+The ME Security Emitter is a level-emitter-style cable part (crafted from a level emitter and an engineering processor) that emits redstone for 5 seconds when an action is denied on its network; each further denial restarts the 5 seconds. What the signal drives is up to the player. Like a level emitter, it powers the block in front of it, needs a powered network and uses no channel. Its screen, which only the network's owner can open, has two settings:
+
+| Setting | Options |
 |---|---|
-| Off | Denied attempts are not reported. |
-| Alert (default) | The owner gets a chat message naming the player, the permission they were denied and the terminal's position. An owner who is offline gets one summary per terminal at their next login. |
-| Alert and redstone | As Alert, and the cable-bus block holding the terminal emits a redstone signal of 15 from every side for 5 seconds. |
+| Triggered by | **Strangers** (default): only players who are neither the owner nor trusted. **Everyone**: anyone who is denied, including a trusted player using a permission they do not have. |
+| Redstone output | **On after a denied action** (default), or **Off after a denied action**, which emits until a denial and then stops for 5 seconds. |
 
-Reports are limited to one per intruder and terminal each minute, and each is also written to the server log. The login summary keeps at most 16 intruders per terminal and is cleared once shown. The redstone signal is weak power, so it lights a lamp or powers dust, a piston or a door placed directly against the terminal's block but does not pass through a solid block; further denied attempts restart the 5 seconds. Redstone is off until the owner switches it on, because anyone who can touch the network can then trigger it. The signal comes from the terminal's own block, so nothing is emitted while that chunk is unloaded, and it never loads a chunk.
+An emitter works independently of the terminal's alerts and follows the same rules about what counts as a denial. Anyone who can touch the network can trigger it, so connect only what a stranger may set off. Players with Build can remove it like any other network hardware.
 
 Wireless terminals still require normal AE2 access-point pairing and range or quantum-link conditions. A paired item does not grant ME Security permissions.
 

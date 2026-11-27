@@ -4,13 +4,17 @@ import java.util.UUID;
 
 import appeng.api.parts.PartHelper;
 import appeng.api.util.AEColor;
+import appeng.core.definitions.AEBlocks;
 import appeng.core.definitions.AEParts;
 import com.mojang.authlib.GameProfile;
 import dev.ae2security.MESecurity;
 import dev.ae2security.menu.SecurityMenu;
 import dev.ae2security.network.SetAlarm;
+import dev.ae2security.part.SecurityEmitterPart;
 import dev.ae2security.part.SecurityTerminalPart;
 import dev.ae2security.security.AlarmMode;
+import dev.ae2security.security.EmitterTrigger;
+import dev.ae2security.security.MenuAccess;
 import dev.ae2security.security.Permission;
 import dev.ae2security.security.SecurityAccess;
 import dev.ae2security.security.SecurityAlarm;
@@ -29,61 +33,62 @@ import net.neoforged.neoforge.common.util.FakePlayerFactory;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
-/** The intrusion alarm on a real, placed Security Terminal: who raises it, what it emits and who is told. */
+/**
+ * The intrusion alarm on a real, placed Security Terminal and Security Emitter: who triggers it, what the
+ * emitter outputs and who is told.
+ */
 @GameTestHolder(MESecurity.ID)
 @PrefixGameTestTemplate(false)
 public final class AlarmGameTests {
     /** Every fixture stays within 0..4 on each axis so neighboring tests can never join its networks. */
     private static final BlockPos CENTER = new BlockPos(2, 1, 2);
+    /** A powered network needs a moment to boot before its emitter is active. */
+    private static final int BOOT_TICKS = 20;
 
     private AlarmGameTests() {}
 
     @GameTest(templateNamespace = "minecraft", template = "bastion/mobs/empty", timeoutTicks = 200)
-    public static void onlyAStrangerRaisesTheRedstoneAlarmAndItEndsByItself(GameTestHelper helper) {
+    public static void anEmitterWatchingStrangersPulsesOnlyForThemAndEndsByItself(GameTestHelper helper) {
         var level = helper.getLevel();
         var position = helper.absolutePos(CENTER);
         var lamp = position.above();
-        var owner = player(level, "AlarmOwner", position);
-        var trusted = player(level, "AlarmTrusted", position);
+        var owner = player(level, "EmitterOwner", position);
+        var trusted = player(level, "EmitterTrusted", position);
         var terminal = terminal(level, position, owner);
+        var emitter = poweredEmitter(level, position, owner);
         level.setBlockAndUpdate(lamp, Blocks.REDSTONE_LAMP.defaultBlockState());
-        // A part joins the world, and gets its policy, on the first tick after its cable bus is placed.
-        helper.runAfterDelay(5, () -> {
+        helper.runAfterDelay(BOOT_TICKS, () -> {
             var data = SecuritySavedData.get(level.getServer());
             var id = terminal.terminalId();
             var grid = terminal.getGridNode().getGrid();
             data.update(id, data.policy(id).trust(owner.getUUID(), trusted.getUUID(), Permission.VIEW.bit()));
+            helper.assertTrue(emitter.isActive(), "precondition: the emitter is powered");
+            helper.assertValueEqual(EmitterTrigger.STRANGERS, emitter.trigger(), "a new emitter watches strangers");
+            helper.assertFalse(lit(level, lamp), "nothing is emitted before an action is denied");
 
-            helper.assertFalse(SecurityAccess.allow(grid, player(level, "AlarmFirst", position), Permission.VIEW, false),
-                    "precondition: a stranger is denied");
-            helper.assertFalse(SecurityAlarm.pulsing(terminal), "redstone is off until the owner switches it on");
-            helper.assertFalse(lit(level, lamp), "the default mode powers nothing");
-
-            data.setAlarmMode(id, AlarmMode.REDSTONE);
             helper.assertFalse(SecurityAccess.allow(grid, trusted, Permission.BUILD, false),
                     "precondition: a trusted player without Build is denied");
             helper.assertTrue(SecurityAccess.allow(grid, owner, Permission.BUILD, false), "precondition: the owner is allowed");
-            var stranger = player(level, "AlarmStranger", position);
+            var stranger = player(level, "EmitterStranger", position);
             helper.assertFalse(SecurityAlarm.quietly(() -> SecurityAccess.allow(grid, stranger, Permission.VIEW, false)),
                     "precondition: a re-validation is denied too");
-            helper.assertFalse(SecurityAlarm.pulsing(terminal),
-                    "a trusted player lacking a permission and a re-validated open menu are not intrusions");
+            helper.assertFalse(SecurityAlarm.pulsing(emitter),
+                    "a trusted player lacking a permission and a re-validated open menu do not trigger it");
 
+            data.setAlarmMode(id, AlarmMode.OFF);
             helper.assertFalse(SecurityAccess.allow(grid, stranger, Permission.EXTRACT, false), "the stranger is denied");
-            helper.assertTrue(SecurityAlarm.pulsing(terminal), "a stranger's denied attempt starts the pulse");
-            for (var side : Direction.values()) {
-                helper.assertValueEqual(15, level.getSignal(position, side), "signal towards " + side);
-            }
-            // AE2 updates a cable bus's neighbors on the next tick, never in the middle of the denied action.
-            helper.runAfterDelay(3, () -> {
-                helper.assertTrue(lit(level, lamp), "a lamp beside the terminal's block lights");
+            helper.assertTrue(SecurityAlarm.pulsing(emitter), "a stranger triggers it, whatever the terminal's alerts");
+            helper.assertValueEqual(0, emitter.isProvidingStrongPower(),
+                    "the output changes at the end of the tick, never in the middle of the denied action");
+            helper.runAfterDelay(2, () -> {
+                helper.assertValueEqual(15, emitter.isProvidingStrongPower(), "the emitter's output");
+                helper.assertTrue(lit(level, lamp), "a lamp in front of the emitter lights");
                 helper.runAfterDelay(SecurityAlarm.PULSE_TICKS + 10, () -> {
-                    helper.assertFalse(SecurityAlarm.pulsing(terminal), "the pulse ends by itself");
-                    helper.assertValueEqual(0, level.getSignal(position, Direction.DOWN), "signal after the pulse");
+                    helper.assertFalse(SecurityAlarm.pulsing(emitter), "the pulse ends by itself");
+                    helper.assertValueEqual(0, emitter.isProvidingStrongPower(), "the output after the pulse");
                     helper.assertFalse(lit(level, lamp), "the lamp goes out again");
-                    data.retire(id);
+                    cleanUp(level, position, id);
                     level.destroyBlock(lamp, false);
-                    level.destroyBlock(position, false);
                     helper.succeed();
                 });
             });
@@ -91,39 +96,72 @@ public final class AlarmGameTests {
     }
 
     @GameTest(templateNamespace = "minecraft", template = "bastion/mobs/empty", timeoutTicks = 100)
-    public static void tamperingWithTheTerminalItselfRaisesTheAlarmOnlyForStrangers(GameTestHelper helper) {
+    public static void anEmitterWatchingEveryoneReactsToTrustedPlayersAndCanBeInverted(GameTestHelper helper) {
+        var level = helper.getLevel();
+        var position = helper.absolutePos(CENTER);
+        var owner = player(level, "EveryoneOwner", position);
+        var trusted = player(level, "EveryoneTrusted", position);
+        var terminal = terminal(level, position, owner);
+        var emitter = poweredEmitter(level, position, owner);
+        emitter.setTrigger(EmitterTrigger.EVERYONE);
+        helper.runAfterDelay(BOOT_TICKS, () -> {
+            var data = SecuritySavedData.get(level.getServer());
+            var id = terminal.terminalId();
+            var grid = terminal.getGridNode().getGrid();
+            data.update(id, data.policy(id).trust(owner.getUUID(), trusted.getUUID(), Permission.VIEW.bit()));
+            emitter.setInverted(true);
+            helper.assertValueEqual(15, emitter.isProvidingStrongPower(), "an inverted emitter emits while all is quiet");
+
+            helper.assertTrue(SecurityAccess.allow(grid, owner, Permission.BUILD, false), "precondition: the owner is allowed");
+            helper.assertFalse(SecurityAlarm.pulsing(emitter), "an allowed action never triggers it");
+            helper.assertFalse(SecurityAccess.allow(grid, trusted, Permission.BUILD, false),
+                    "precondition: a trusted player without Build is denied");
+            helper.assertTrue(SecurityAlarm.pulsing(emitter), "an emitter watching everyone reacts to a trusted player");
+            helper.assertTrue(SecurityAlarm.digest(level.getServer(), owner.getUUID()).isEmpty(),
+                    "a trusted player is still never reported to the owner");
+            helper.runAfterDelay(2, () -> {
+                helper.assertValueEqual(0, emitter.isProvidingStrongPower(), "an inverted emitter goes dark when triggered");
+                emitter.setInverted(false);
+                helper.assertValueEqual(15, emitter.isProvidingStrongPower(), "switching back takes effect at once");
+                cleanUp(level, position, id);
+                helper.assertFalse(SecurityAlarm.pulsing(emitter), "a removed emitter is forgotten");
+                helper.succeed();
+            });
+        });
+    }
+
+    @GameTest(templateNamespace = "minecraft", template = "bastion/mobs/empty", timeoutTicks = 100)
+    public static void tamperingWithTheTerminalItselfTriggersAnEmitterOnlyForStrangers(GameTestHelper helper) {
         var level = helper.getLevel();
         var position = helper.absolutePos(CENTER);
         var owner = player(level, "TamperOwner", position);
         var builder = player(level, "TamperBuilder", position);
         var stranger = player(level, "TamperStranger", position);
         var terminal = terminal(level, position, owner);
+        var emitter = emitter(level, position, owner);
         helper.runAfterDelay(5, () -> {
             var data = SecuritySavedData.get(level.getServer());
             var id = terminal.terminalId();
             data.update(id, data.policy(id).trust(owner.getUUID(), builder.getUUID(), Permission.BUILD.bit()));
-            data.setAlarmMode(id, AlarmMode.REDSTONE);
             var host = level.getBlockEntity(position);
 
             helper.assertFalse(SecurityBreak.allowBlockBreak(host, builder), "precondition: only the owner breaks it");
+            helper.assertFalse(SecurityAlarm.pulsing(emitter), "a trusted builder at the terminal is not an intruder");
             terminal.onUseWithoutItem(builder, Vec3.atCenterOf(position));
-            helper.assertFalse(SecurityAlarm.pulsing(terminal), "a trusted player at the terminal is not an intruder");
+            helper.assertFalse(SecurityAlarm.pulsing(emitter), "nor is a trusted player opening the owner's screen");
 
             terminal.onUseWithoutItem(stranger, Vec3.atCenterOf(position));
-            helper.assertTrue(SecurityAlarm.pulsing(terminal), "a stranger trying to open the owner's screen is");
-
+            helper.assertTrue(SecurityAlarm.pulsing(emitter), "a stranger trying to open the owner's screen is");
             data.retire(id);
             level.destroyBlock(position, false);
-            helper.assertFalse(SecurityAlarm.pulsing(terminal), "a removed terminal stops emitting");
 
             var second = terminal(level, position, owner);
+            var secondEmitter = emitter(level, position, owner);
             helper.runAfterDelay(5, () -> {
-                data.setAlarmMode(second.terminalId(), AlarmMode.REDSTONE);
                 helper.assertFalse(SecurityBreak.allowBlockBreak(level.getBlockEntity(position), stranger),
                         "precondition: a stranger cannot break the terminal");
-                helper.assertTrue(SecurityAlarm.pulsing(second), "a stranger trying to break the terminal is an intruder");
-                data.retire(second.terminalId());
-                level.destroyBlock(position, false);
+                helper.assertTrue(SecurityAlarm.pulsing(secondEmitter), "a stranger trying to break the terminal is an intruder");
+                cleanUp(level, position, second.terminalId());
                 helper.succeed();
             });
         });
@@ -184,6 +222,8 @@ public final class AlarmGameTests {
             var data = SecuritySavedData.get(level.getServer());
             var id = terminal.terminalId();
             helper.assertValueEqual(AlarmMode.ALERT, data.alarmMode(id), "a new terminal alerts its owner");
+            helper.assertValueEqual(MenuAccess.OWNER, MenuAccess.of(MESecurity.id("security_emitter")),
+                    "only the owner opens a Security Emitter's settings");
 
             var forged = new SecurityMenu(10, stranger.getInventory(), terminal);
             stranger.containerMenu = forged;
@@ -196,8 +236,8 @@ public final class AlarmGameTests {
             menu.setAlarm(stranger, new SetAlarm(9, AlarmMode.OFF));
             menu.setAlarm(owner, new SetAlarm(8, AlarmMode.OFF));
             helper.assertValueEqual(AlarmMode.ALERT, data.alarmMode(id), "another player or another menu id is ignored");
-            menu.setAlarm(owner, new SetAlarm(9, AlarmMode.REDSTONE));
-            helper.assertValueEqual(AlarmMode.REDSTONE, data.alarmMode(id), "the owner switches the mode");
+            menu.setAlarm(owner, new SetAlarm(9, AlarmMode.OFF));
+            helper.assertValueEqual(AlarmMode.OFF, data.alarmMode(id), "the owner switches alerts off");
             owner.containerMenu = owner.inventoryMenu;
 
             data.retire(id);
@@ -215,6 +255,25 @@ public final class AlarmGameTests {
         var player = FakePlayerFactory.get(level, new GameProfile(UUID.randomUUID(), name));
         player.setPos(Vec3.atCenterOf(near));
         return player;
+    }
+
+    /** An emitter facing up on the terminal's cable, so its signal reaches the block above. */
+    private static SecurityEmitterPart emitter(ServerLevel level, BlockPos position, ServerPlayer owner) {
+        var part = PartHelper.setPart(level, position, Direction.UP, owner, MESecurity.EMITTER_ITEM.get());
+        if (!(part instanceof SecurityEmitterPart emitter)) throw new IllegalStateException("Could not place GameTest emitter");
+        return emitter;
+    }
+
+    /** An emitter only outputs while its network is powered, so this one gets a creative energy cell below. */
+    private static SecurityEmitterPart poweredEmitter(ServerLevel level, BlockPos position, ServerPlayer owner) {
+        level.setBlockAndUpdate(position.below(), AEBlocks.CREATIVE_ENERGY_CELL.block().defaultBlockState());
+        return emitter(level, position, owner);
+    }
+
+    private static void cleanUp(ServerLevel level, BlockPos position, UUID terminal) {
+        SecuritySavedData.get(level.getServer()).retire(terminal);
+        level.destroyBlock(position, false);
+        level.destroyBlock(position.below(), false);
     }
 
     private static SecurityTerminalPart terminal(ServerLevel level, BlockPos position, ServerPlayer owner) {

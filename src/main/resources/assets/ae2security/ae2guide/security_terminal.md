@@ -98,23 +98,14 @@ stay in place. The previous owner loses access unless the new owner trusts them 
 
 The terminal notices when a player you have not trusted is denied on your network,
 whether they tried to open a terminal, take items, build, or break something. A
-trusted player who only lacks one permission never raises the alarm.
+trusted player who only lacks one permission is never reported.
 
-The alarm button under the transfer arrow switches between three modes:
+The alarm button under the transfer arrow switches alerts on and off. With **Alert**,
+the default, you get a chat message naming the player and the terminal's position, or a
+summary the next time you log in if you were offline. You are told about each intruder
+at most once a minute.
 
-| Mode | What happens |
-| --- | --- |
-| Off | Denied attempts are not reported. |
-| Alert | You get a chat message naming the player and the terminal's position. If you are offline, you get a summary the next time you log in. |
-| Alert and redstone | As Alert, and the terminal's block emits a redstone signal from every side for 5 seconds. |
-
-New terminals start on **Alert**. You are told about each intruder at most once a minute.
-
-With redstone on, place a redstone lamp, redstone dust, a piston or a door directly
-against the block that holds the terminal. The signal does not pass through solid
-blocks, and every further denied attempt restarts the 5 seconds. Build a latch if you
-want the alarm to stay on until you reset it. Anyone who touches your network can
-trigger the signal, so connect only what you are happy for a stranger to set off.
+For a redstone signal, add a [Security Emitter](security_emitter.md) to the network.
 
 ## Wireless access and automation
 

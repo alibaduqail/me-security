@@ -229,7 +229,6 @@ public final class SecurityTerminalPart extends AbstractDisplayPart implements M
             retirePolicy();
         }
         policyCreatedTick = -1;
-        SecurityAlarm.forget(this);
         if (inWorld && getLevel() instanceof ServerLevel level) {
             SecuritySavedData.get(level.getServer()).markOutOfWorld(terminalId, location());
         }
@@ -248,7 +247,7 @@ public final class SecurityTerminalPart extends AbstractDisplayPart implements M
                     data.writeEnum(getSide());
                 });
             } else {
-                // Trusted players are told the same; only a stranger at the terminal raises the alarm.
+                // Trusted players are told the same; only a stranger alerts the owner, but emitters may watch everyone.
                 SecurityAlarm.denied(this, player, Permission.VIEW);
                 player.displayClientMessage(Component.translatable("message.ae2security.owner_only"), true);
             }
