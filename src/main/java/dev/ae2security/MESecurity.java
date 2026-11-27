@@ -2,6 +2,7 @@ package dev.ae2security;
 
 import appeng.api.networking.GridServices;
 import appeng.api.parts.PartModels;
+import appeng.api.upgrades.Upgrades;
 import dev.ae2security.gametest.SecurityGameTests;
 import dev.ae2security.gametest.HardwareGameTests;
 import dev.ae2security.integration.SecurityTerminalTooltip;
@@ -47,6 +48,9 @@ public final class MESecurity {
             new PartItem<>(new Item.Properties(), SecurityEmitterPart.class, SecurityEmitterPart::new));
     public static final DeferredHolder<MenuType<?>, MenuType<SecurityEmitterMenu>> EMITTER_MENU = MENUS.register("security_emitter", () ->
             MenuTypeBuilder.create(SecurityEmitterMenu::new, SecurityEmitterPart.class).buildUnregistered(id("security_emitter")));
+    /** Goes in a wireless terminal; its carrier is told when a stranger is denied on the linked network. */
+    public static final DeferredItem<Item> ALERT_CARD = ITEMS.register("intrusion_alert_card", () ->
+            Upgrades.createUpgradeCardItem(new Item.Properties()));
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> CREATIVE_TAB =
             CREATIVE_TABS.register("main", () -> CreativeModeTab.builder()
                     .title(Component.translatable("itemGroup.ae2security"))
@@ -54,6 +58,7 @@ public final class MESecurity {
                     .displayItems((parameters, output) -> {
                         output.accept(TERMINAL_ITEM.get());
                         output.accept(EMITTER_ITEM.get());
+                        output.accept(ALERT_CARD.get());
                     })
                     .build());
 
@@ -81,6 +86,7 @@ public final class MESecurity {
         event.enqueueWork(() -> {
             GridServices.register(ISecurityGrid.class, SecurityGridService.class);
             SecurityWorldEvents.registerGridEvents();
+            IntrusionAlerts.registerCard();
         });
     }
     private void gameTests(RegisterGameTestsEvent event) {

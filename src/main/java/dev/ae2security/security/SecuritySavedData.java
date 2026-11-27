@@ -67,10 +67,6 @@ public final class SecuritySavedData extends SavedData {
     private final Map<UUID, String> playersView = Collections.unmodifiableMap(players);
     private record CraftedOutput(UUID terminal, UUID player, AEKey key) {}
     private final Map<CraftedOutput, Long> craftedOutputs = new HashMap<>();
-    /** Only the terminals whose owner chose something other than {@link AlarmMode#DEFAULT}. */
-    private final Map<UUID, AlarmMode> alarmModes = new HashMap<>();
-    /** Denied attempts waiting for each terminal owner's next login. */
-    private final Map<UUID, AlarmLog> pendingAlarms = new HashMap<>();
     private long directoryRevision;
     private long footprintRevision;
 
@@ -144,37 +140,6 @@ public final class SecuritySavedData extends SavedData {
         setDirty();
     }
 
-    public AlarmMode alarmMode(UUID terminal) { return alarmModes.getOrDefault(terminal, AlarmMode.DEFAULT); }
-
-    public void setAlarmMode(UUID terminal, AlarmMode mode) {
-        if (!policies.containsKey(terminal) || alarmMode(terminal) == mode) return;
-        if (mode == AlarmMode.DEFAULT) alarmModes.remove(terminal);
-        else alarmModes.put(terminal, mode);
-        setDirty();
-    }
-
-    /** Keeps a denied attempt for an owner who is not online to be told about it. */
-    public void recordAlarm(UUID terminal, UUID intruder, String name, long nowMillis) {
-        if (!policies.containsKey(terminal)) return;
-        pendingAlarms.computeIfAbsent(terminal, key -> new AlarmLog()).record(intruder, name, nowMillis);
-        setDirty();
-    }
-
-    /** Removes and returns everything waiting for this owner, by terminal. */
-    public Map<UUID, List<AlarmLog.Entry>> takeAlarms(UUID owner) {
-        if (pendingAlarms.isEmpty()) return Map.of();
-        var taken = new TreeMap<UUID, List<AlarmLog.Entry>>();
-        for (var pending = pendingAlarms.entrySet().iterator(); pending.hasNext();) {
-            var entry = pending.next();
-            var policy = policies.get(entry.getKey());
-            if (policy == null || !policy.isOwner(owner)) continue;
-            taken.put(entry.getKey(), entry.getValue().entries());
-            pending.remove();
-        }
-        if (!taken.isEmpty()) setDirty();
-        return taken;
-    }
-
     public TerminalLocation location(UUID terminal) { return locations.get(terminal); }
 
     public void setLocation(UUID terminal, TerminalLocation location) {
@@ -223,8 +188,6 @@ public final class SecuritySavedData extends SavedData {
         policies.remove(terminal);
         if (footprints.remove(terminal) != null) footprintRevision++;
         locations.remove(terminal);
-        alarmModes.remove(terminal);
-        pendingAlarms.remove(terminal);
         retired.add(terminal);
         craftedOutputs.keySet().removeIf(claim -> claim.terminal().equals(terminal));
         setDirty();
@@ -328,14 +291,6 @@ public final class SecuritySavedData extends SavedData {
                     if (location == null) LOGGER.warn("Ignoring an unreadable location for terminal {} in {}", id, FILE);
                     else data.locations.put(id, location);
                 }
-                // Optional, like the location: an alarm setting or a pending alert grants nothing.
-                if (row.contains("alarm")) {
-                    var mode = AlarmMode.byId(row.getString("alarm"));
-                    if (mode == null) LOGGER.warn("Ignoring an unknown alarm mode for terminal {} in {}", id, FILE);
-                    else if (mode != AlarmMode.DEFAULT) data.alarmModes.put(id, mode);
-                }
-                var pending = AlarmLog.read(row.getList("alarmPending", Tag.TAG_COMPOUND));
-                if (!pending.isEmpty()) data.pendingAlarms.put(id, pending);
             }
             for (var element : strictList(tag, "retired", Tag.TAG_INT_ARRAY)) data.retired.add(NbtUtils.loadUUID(element));
         } catch (RuntimeException e) {
@@ -394,10 +349,6 @@ public final class SecuritySavedData extends SavedData {
             row.put("chunks", chunks);
             var location = locations.get(id);
             if (location != null) row.put("location", location.write());
-            var mode = alarmModes.get(id);
-            if (mode != null) row.putString("alarm", mode.id());
-            var pending = pendingAlarms.get(id);
-            if (pending != null && !pending.isEmpty()) row.put("alarmPending", pending.write());
             entries.add(row);
         });
         tag.put("policies", entries);

@@ -44,31 +44,10 @@ class SecurityAlarmTest {
         SecurityAlarm.forgetReports();
     }
 
-    @Test void agesAreCoarseAndNeverNegative() {
-        long minute = 60_000L;
-        assertEquals(new SecurityAlarm.Ago("moments", 0), SecurityAlarm.ago(-5_000));
-        assertEquals(new SecurityAlarm.Ago("moments", 0), SecurityAlarm.ago(minute - 1));
-        assertEquals(new SecurityAlarm.Ago("minutes", 1), SecurityAlarm.ago(minute));
-        assertEquals(new SecurityAlarm.Ago("minutes", 59), SecurityAlarm.ago(60 * minute - 1));
-        assertEquals(new SecurityAlarm.Ago("hours", 1), SecurityAlarm.ago(60 * minute));
-        assertEquals(new SecurityAlarm.Ago("hours", 47), SecurityAlarm.ago(48 * 60 * minute - 1));
-        assertEquals(new SecurityAlarm.Ago("days", 2), SecurityAlarm.ago(48 * 60 * minute));
-    }
-
-    @Test void theOwnerButtonVisitsEveryModeAndSavedNamesReadBack() {
-        var seen = java.util.EnumSet.noneOf(AlarmMode.class);
-        var mode = AlarmMode.DEFAULT;
-        for (int i = 0; i < AlarmMode.values().length; i++) {
-            seen.add(mode);
-            assertEquals(mode, AlarmMode.byId(mode.id()));
-            mode = mode.next();
-        }
-        assertEquals(java.util.EnumSet.allOf(AlarmMode.class), seen);
-        assertEquals(AlarmMode.DEFAULT, mode, "the button comes back round to where it started");
-        assertNull(AlarmMode.byId("siren"));
-        assertNull(AlarmMode.byId("redstone"), "redstone output moved to the Security Emitter");
-        assertTrue(AlarmMode.ALERT.alerts());
-        assertFalse(AlarmMode.OFF.alerts());
+    @Test void vanillaDimensionsAreNamedShortlyInAlerts() {
+        assertEquals("overworld", SecurityAlarm.dimensionName("minecraft:overworld"));
+        assertEquals("the_nether", SecurityAlarm.dimensionName("minecraft:the_nether"));
+        assertEquals("twilightforest:twilight_forest", SecurityAlarm.dimensionName("twilightforest:twilight_forest"));
     }
 
     @Test void anEmitterWatchesStrangersUnlessSetToEveryone() {

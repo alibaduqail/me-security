@@ -100,12 +100,9 @@ The terminal notices when a player you have not trusted is denied on your networ
 whether they tried to open a terminal, take items, build, or break something. A
 trusted player who only lacks one permission is never reported.
 
-The alarm button under the transfer arrow switches alerts on and off. With **Alert**,
-the default, you get a chat message naming the player and the terminal's position, or a
-summary the next time you log in if you were offline. You are told about each intruder
-at most once a minute.
-
-For a redstone signal, add a [Security Emitter](security_emitter.md) to the network.
+To hear about it, put an [Intrusion Alert Card](intrusion_alert_card.md) in a wireless
+terminal linked to the network and carry it. For a redstone signal, add a
+[Security Emitter](security_emitter.md) to the network.
 
 ## Wireless access and automation
 
