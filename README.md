@@ -56,12 +56,12 @@ The alarm button in the screen's left toolbar, under the transfer arrow, switche
 
 ### Security Emitter
 
-The ME Security Emitter is a level-emitter-style cable part (crafted from a level emitter and an engineering processor) that emits redstone for 5 seconds when an action is denied on its network; each further denial restarts the 5 seconds. What the signal drives is up to the player. Like a level emitter, it powers the block in front of it, needs a powered network and uses no channel. Its screen, which only the network's owner can open, has two settings:
+The ME Security Emitter is a level-emitter-style cable part (crafted from a level emitter and an engineering processor) that emits a two-tick redstone pulse, like an observer's, when an action is denied on its network; every denial gives its own pulse. What the signal drives is up to the player. Like a level emitter, it powers the block in front of it, needs a powered network and uses no channel. Its screen, which only the network's owner can open, has two settings:
 
 | Setting | Options |
 |---|---|
 | Triggered by | **Strangers** (default): only players who are neither the owner nor trusted. **Everyone**: anyone who is denied, including a trusted player using a permission they do not have. |
-| Redstone output | **On after a denied action** (default), or **Off after a denied action**, which emits until a denial and then stops for 5 seconds. |
+| Redstone output | **Pulse when denied** (default), or **Inverted pulse**, which emits all the time and stops for two ticks on a denial. |
 
 An emitter works independently of the terminal's alerts and follows the same rules about what counts as a denial. Anyone who can touch the network can trigger it, so connect only what a stranger may set off. Players with Build can remove it like any other network hardware.
 
