@@ -32,7 +32,7 @@ as many as you like.
 
 ## Settings
 
-Only the network's owner can open its screen. The two buttons on the left choose:
+Only the network's owner can open its screen. The wide button sets who triggers it, and the redstone button in the left toolbar sets the output:
 
 | Setting | Options |
 | --- | --- |

@@ -1,23 +1,23 @@
 {
   "$schema": "../schema.json",
-  "$comment": "ME Security Emitter. Lives in the ae2 namespace because AE2's StyleManager only loads styles from there. The two settings are the left toolbar buttons; the lines below spell out what they are set to.",
+  "$comment": "ME Security Emitter. Lives in the ae2 namespace because AE2's StyleManager only loads styles from there. Whose denials trigger it is the button in the body; the redstone output is the left toolbar button.",
   "includes": ["../common/common.json"],
   "generatedBackground": {
     "width": 176,
-    "height": 54
+    "height": 48
   },
   "text": {
     "dialog_title": {
       "text": { "translate": "gui.ae2security.security_emitter" },
       "position": { "left": 8, "top": 6 }
-    },
+    }
+  },
+  "widgets": {
     "trigger": {
-      "text": "",
-      "position": { "left": 8, "top": 22 }
-    },
-    "output": {
-      "text": "",
-      "position": { "left": 8, "top": 36 }
+      "left": 8,
+      "top": 20,
+      "width": 160,
+      "height": 20
     }
   }
 }
