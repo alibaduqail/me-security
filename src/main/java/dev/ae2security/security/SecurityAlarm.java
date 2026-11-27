@@ -2,7 +2,6 @@ package dev.ae2security.security;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -16,21 +15,19 @@ import dev.ae2security.part.SecurityEmitterPart;
 import dev.ae2security.part.SecurityTerminalPart;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.ComponentUtils;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.bus.api.IEventBus;
-import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import org.slf4j.Logger;
 
 /**
  * The intrusion alarm. When a player is denied on a protected network, every Security Emitter on it
- * that watches for that kind of player emits a short redstone pulse, as long as an observer's. When the player has no standing there
- * (neither owner nor trusted), the network's Security Terminal also tells its owner, unless the owner
- * switched alerts off.
+ * that watches for that kind of player emits a short redstone pulse, as long as an observer's. When the
+ * player has no standing there (neither owner nor trusted), everyone with standing who carries an
+ * Intrusion Alert Card for the network is told; see {@link IntrusionAlerts}.
  *
  * <p>It reacts to denials and decides nothing: no access check reads anything kept here.
  */
@@ -44,8 +41,6 @@ public final class SecurityAlarm {
     /** One report per intruder and terminal in this many ticks, however often they try. */
     static final int REPORT_INTERVAL_TICKS = 1200;
     private static final int MAX_REPORT_KEYS = 1024;
-    /** Intruders named in a login summary before the rest are counted. */
-    private static final int DIGEST_NAMES = 5;
 
     private record ReportKey(UUID terminal, UUID intruder) {}
     /** Server tick of the last report. Only touched on the server thread; cleared when the server stops. */
@@ -60,11 +55,6 @@ public final class SecurityAlarm {
 
     public static void register(IEventBus bus) {
         bus.addListener((ServerTickEvent.Post event) -> tick(event.getServer()));
-        bus.addListener((PlayerEvent.PlayerLoggedInEvent event) -> {
-            if (event.getEntity() instanceof ServerPlayer player) {
-                digest(player.server, player.getUUID()).forEach(player::sendSystemMessage);
-            }
-        });
         bus.addListener((ServerStoppedEvent event) -> {
             LAST_REPORT.clear();
             PULSING.clear();
@@ -118,16 +108,17 @@ public final class SecurityAlarm {
                 if (emitter.trigger().reactsTo(stranger)) pulse(emitter, tick);
             }
         }
-        if (!stranger || !data.alarmMode(terminalId).alerts() || !due(terminalId, actor.getUUID(), tick)) return;
+        if (!stranger || !due(terminalId, actor.getUUID(), tick)) return;
 
         var name = actor.getGameProfile().getName();
         var where = data.location(terminalId);
         LOGGER.info("ME Security alarm: {} ({}) was denied {} on the network of Security Terminal {} at {}",
                 name, actor.getUUID(), permission.name().toLowerCase(Locale.ROOT), terminalId,
                 where == null ? "an unknown location" : where);
-        var owner = server.getPlayerList().getPlayer(policy.owner());
-        if (owner != null) owner.sendSystemMessage(liveAlert(name, permission, where));
-        else data.recordAlarm(terminalId, actor.getUUID(), name, System.currentTimeMillis());
+        var recipients = IntrusionAlerts.recipients(server.getPlayerList().getPlayers(), grid, policy, actor.getUUID());
+        if (recipients.isEmpty()) return;
+        var alert = alert(name, permission, where);
+        for (var recipient : recipients) IntrusionAlerts.send(recipient, alert);
     }
 
     /** Whether this intruder's attempt is reported, and if so starts their next interval. */
@@ -181,38 +172,9 @@ public final class SecurityAlarm {
 
     // ---- messages ----
 
-    /** What the owner is told at login. Takes everything that was waiting for them. */
-    public static List<Component> digest(MinecraftServer server, UUID owner) {
-        var data = SecuritySavedData.get(server);
-        var waiting = data.takeAlarms(owner);
-        if (waiting.isEmpty()) return List.of();
-        long now = System.currentTimeMillis();
-        var lines = new ArrayList<Component>(waiting.size());
-        waiting.forEach((terminal, entries) -> lines.add(digestLine(entries, data.location(terminal), now)));
-        return lines;
-    }
-
-    private static Component liveAlert(String intruder, Permission permission, TerminalLocation where) {
+    private static Component alert(String intruder, Permission permission, TerminalLocation where) {
         return Component.translatable("message.ae2security.alarm.live", intruder,
                 Component.translatable("permission.ae2security." + permission.name().toLowerCase(Locale.ROOT)),
-                location(where)).withStyle(ChatFormatting.YELLOW);
-    }
-
-    /** @param entries most recent first, never empty */
-    private static Component digestLine(List<AlarmLog.Entry> entries, TerminalLocation where, long nowMillis) {
-        var names = new ArrayList<Component>();
-        for (var entry : entries.subList(0, Math.min(DIGEST_NAMES, entries.size()))) {
-            names.add(entry.count() > 1
-                    ? Component.translatable("message.ae2security.alarm.repeated", entry.name(), entry.count())
-                    : Component.literal(entry.name()));
-        }
-        if (entries.size() > DIGEST_NAMES) {
-            names.add(Component.translatable("message.ae2security.alarm.more", entries.size() - DIGEST_NAMES));
-        }
-        var ago = ago(nowMillis - entries.get(0).lastMillis());
-        return Component.translatable("message.ae2security.alarm.digest",
-                ComponentUtils.formatList(names, Component.literal(", ")),
-                Component.translatable("message.ae2security.alarm.ago." + ago.unit(), ago.amount()),
                 location(where)).withStyle(ChatFormatting.YELLOW);
     }
 
@@ -220,16 +182,5 @@ public final class SecurityAlarm {
         if (where == null) return Component.translatable("message.ae2security.alarm.location_unknown");
         return Component.translatable("message.ae2security.alarm.location", where.pos().getX(), where.pos().getY(),
                 where.pos().getZ(), where.dimension());
-    }
-
-    /** A coarse age: {@code unit} is the suffix of the translation key and {@code amount} its argument. */
-    record Ago(String unit, long amount) {}
-
-    static Ago ago(long elapsedMillis) {
-        long minutes = Math.max(0, elapsedMillis) / 60_000;
-        if (minutes < 1) return new Ago("moments", 0);
-        if (minutes < 60) return new Ago("minutes", minutes);
-        if (minutes < 48 * 60) return new Ago("hours", minutes / 60);
-        return new Ago("days", minutes / (24 * 60));
     }
 }

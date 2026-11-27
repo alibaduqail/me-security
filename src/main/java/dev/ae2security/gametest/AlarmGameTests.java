@@ -1,19 +1,20 @@
 package dev.ae2security.gametest;
 
+import java.util.List;
 import java.util.UUID;
 
 import appeng.api.parts.PartHelper;
 import appeng.api.util.AEColor;
 import appeng.core.definitions.AEBlocks;
+import appeng.core.definitions.AEItems;
+import appeng.items.tools.powered.WirelessTerminalItem;
 import appeng.core.definitions.AEParts;
 import com.mojang.authlib.GameProfile;
 import dev.ae2security.MESecurity;
-import dev.ae2security.menu.SecurityMenu;
-import dev.ae2security.network.SetAlarm;
 import dev.ae2security.part.SecurityEmitterPart;
 import dev.ae2security.part.SecurityTerminalPart;
-import dev.ae2security.security.AlarmMode;
 import dev.ae2security.security.EmitterTrigger;
+import dev.ae2security.security.IntrusionAlerts;
 import dev.ae2security.security.MenuAccess;
 import dev.ae2security.security.Permission;
 import dev.ae2security.security.SecurityAccess;
@@ -22,12 +23,16 @@ import dev.ae2security.security.SecurityBreak;
 import dev.ae2security.security.SecuritySavedData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.RedstoneLampBlock;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.common.util.FakePlayerFactory;
 import net.neoforged.neoforge.gametest.GameTestHolder;
@@ -35,7 +40,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
  * The intrusion alarm on a real, placed Security Terminal and Security Emitter: who triggers it, what the
- * emitter outputs and who is told.
+ * emitter outputs and who an Intrusion Alert Card tells.
  */
 @GameTestHolder(MESecurity.ID)
 @PrefixGameTestTemplate(false)
@@ -75,9 +80,8 @@ public final class AlarmGameTests {
             helper.assertFalse(SecurityAlarm.pulsing(emitter),
                     "a trusted player lacking a permission and a re-validated open menu do not trigger it");
 
-            data.setAlarmMode(id, AlarmMode.OFF);
             helper.assertFalse(SecurityAccess.allow(grid, stranger, Permission.EXTRACT, false), "the stranger is denied");
-            helper.assertTrue(SecurityAlarm.pulsing(emitter), "a stranger triggers it, whatever the terminal's alerts");
+            helper.assertTrue(SecurityAlarm.pulsing(emitter), "a stranger triggers it");
             helper.assertValueEqual(0, emitter.isProvidingStrongPower(),
                     "the output changes at the end of the tick, never in the middle of the denied action");
             helper.runAfterDelay(1, () -> {
@@ -124,8 +128,8 @@ public final class AlarmGameTests {
             helper.assertFalse(SecurityAccess.allow(grid, trusted, Permission.BUILD, false),
                     "precondition: a trusted player without Build is denied");
             helper.assertTrue(SecurityAlarm.pulsing(emitter), "an emitter watching everyone reacts to a trusted player");
-            helper.assertTrue(SecurityAlarm.digest(level.getServer(), owner.getUUID()).isEmpty(),
-                    "a trusted player is still never reported to the owner");
+            helper.assertValueEqual(MenuAccess.OWNER, MenuAccess.of(MESecurity.id("security_emitter")),
+                    "only the owner opens a Security Emitter's settings");
             helper.runAfterDelay(1, () -> {
                 helper.assertValueEqual(0, emitter.isProvidingStrongPower(), "an inverted emitter goes dark when triggered");
                 emitter.setInverted(false);
@@ -175,83 +179,77 @@ public final class AlarmGameTests {
     }
 
     @GameTest(templateNamespace = "minecraft", template = "bastion/mobs/empty", timeoutTicks = 100)
-    public static void anAbsentOwnerIsToldAtLoginAndAPresentOneAtOnce(GameTestHelper helper) {
+    public static void onlyPlayersWithStandingCarryingALinkedCardAreAlerted(GameTestHelper helper) {
         var level = helper.getLevel();
         var server = level.getServer();
         var position = helper.absolutePos(CENTER);
-        var owner = player(level, "DigestOwner", position);
+        var accessPoint = position.above();
+        var owner = player(level, "CardOwner", position);
+        var trusted = player(level, "CardTrusted", position);
+        var uncarded = player(level, "CardUncarded", position);
+        var elsewhere = player(level, "CardElsewhere", position);
+        var outsider = player(level, "CardOutsider", position);
+        var stranger = player(level, "CardStranger", position);
         var terminal = terminal(level, position, owner);
+        // An access point facing up joins the cable below it through its back.
+        level.setBlockAndUpdate(accessPoint, AEBlocks.WIRELESS_ACCESS_POINT.block().defaultBlockState()
+                .setValue(BlockStateProperties.FACING, Direction.UP));
         helper.runAfterDelay(5, () -> {
             var data = SecuritySavedData.get(server);
             var id = terminal.terminalId();
             var grid = terminal.getGridNode().getGrid();
+            var policy = data.policy(id);
+            for (var member : List.of(trusted, uncarded, elsewhere)) {
+                policy = policy.trust(owner.getUUID(), member.getUUID(), Permission.VIEW.bit());
+            }
+            data.update(id, policy);
+            var linked = GlobalPos.of(level.dimension(), accessPoint);
 
-            var repeated = player(level, "DigestRepeat", position);
-            SecurityAccess.allow(grid, repeated, Permission.VIEW, false);
-            SecurityAccess.allow(grid, repeated, Permission.EXTRACT, false);
-            SecurityAccess.allow(grid, player(level, "DigestOther", position), Permission.BUILD, false);
-            helper.assertTrue(SecurityAlarm.digest(server, repeated.getUUID()).isEmpty(), "only the owner is told");
-            var lines = SecurityAlarm.digest(server, owner.getUUID());
-            helper.assertValueEqual(1, lines.size(), "one summary line for the terminal");
-            helper.assertTrue(SecurityAlarm.digest(server, owner.getUUID()).isEmpty(), "the summary is given once");
+            owner.getInventory().add(wirelessTerminal(AEItems.WIRELESS_TERMINAL.asItem(), linked, true));
+            trusted.setItemInHand(InteractionHand.OFF_HAND,
+                    wirelessTerminal(AEItems.WIRELESS_CRAFTING_TERMINAL.asItem(), linked, true));
+            uncarded.getInventory().add(wirelessTerminal(AEItems.WIRELESS_TERMINAL.asItem(), linked, false));
+            elsewhere.getInventory().add(wirelessTerminal(AEItems.WIRELESS_TERMINAL.asItem(),
+                    GlobalPos.of(level.dimension(), position.east(64)), true));
+            outsider.getInventory().add(wirelessTerminal(AEItems.WIRELESS_TERMINAL.asItem(), linked, true));
+            stranger.getInventory().add(wirelessTerminal(AEItems.WIRELESS_TERMINAL.asItem(), linked, true));
 
-            data.setAlarmMode(id, AlarmMode.OFF);
-            SecurityAccess.allow(grid, player(level, "DigestMuted", position), Permission.VIEW, false);
-            helper.assertTrue(SecurityAlarm.digest(server, owner.getUUID()).isEmpty(), "a switched-off alarm keeps nothing");
+            var everyone = List.of(owner, trusted, uncarded, elsewhere, outsider, stranger);
+            helper.assertValueEqual(List.of(owner, trusted),
+                    IntrusionAlerts.recipients(everyone, grid, data.policy(id), stranger.getUUID()),
+                    "the owner and a trusted player carrying a card linked to this network, in the inventory or offhand");
 
-            // A real player in the server's list is told at once, so nothing is left for their next login.
-            data.setAlarmMode(id, AlarmMode.ALERT);
+            var full = wirelessTerminal(AEItems.WIRELESS_TERMINAL.asItem(), linked, true);
+            var spare = AEItems.WIRELESS_TERMINAL.asItem().getUpgrades(full).addItems(MESecurity.ALERT_CARD.toStack());
+            helper.assertFalse(spare.isEmpty(), "one card per terminal");
+
+            // A real player in the server's list is sent the alert without failing the denied action.
             var present = helper.makeMockServerPlayerInLevel();
             try {
-                data.update(id, data.policy(id).trust(owner.getUUID(), present.getUUID(), Permission.VIEW.bit())
-                        .transfer(owner.getUUID(), present.getUUID()));
-                SecurityAccess.allow(grid, player(level, "DigestLive", position), Permission.VIEW, false);
-                helper.assertTrue(SecurityAlarm.digest(server, present.getUUID()).isEmpty(),
-                        "an alert delivered live is not repeated at login");
+                data.update(id, data.policy(id).trust(owner.getUUID(), present.getUUID(), Permission.VIEW.bit()));
+                present.getInventory().add(wirelessTerminal(AEItems.WIRELESS_TERMINAL.asItem(), linked, true));
+                helper.assertValueEqual(List.of(present), IntrusionAlerts.recipients(List.of(present), grid,
+                        data.policy(id), stranger.getUUID()), "precondition: the mock player is a recipient");
+                helper.assertFalse(SecurityAccess.allow(grid, stranger, Permission.VIEW, false), "the stranger is denied");
             } finally {
                 // Leave the broadcast list again, or concurrent tests send AE2 packets to the mock.
                 server.getPlayerList().remove(present);
             }
-            SecuritySavedData.get(server).retire(id);
+
+            helper.assertTrue(IntrusionAlerts.recipients(everyone, null, data.policy(id), stranger.getUUID()).isEmpty(),
+                    "nobody is told about a terminal that is on no network");
+            data.retire(id);
+            level.destroyBlock(accessPoint, false);
             level.destroyBlock(position, false);
             helper.succeed();
         });
     }
 
-    @GameTest(templateNamespace = "minecraft", template = "bastion/mobs/empty", timeoutTicks = 100)
-    public static void onlyTheOwnerSwitchesTheAlarmMode(GameTestHelper helper) {
-        var level = helper.getLevel();
-        var position = helper.absolutePos(CENTER);
-        var owner = player(level, "ModeOwner", position);
-        var stranger = player(level, "ModeStranger", position);
-        var terminal = terminal(level, position, owner);
-        helper.runAfterDelay(5, () -> {
-            var data = SecuritySavedData.get(level.getServer());
-            var id = terminal.terminalId();
-            helper.assertValueEqual(AlarmMode.ALERT, data.alarmMode(id), "a new terminal alerts its owner");
-            helper.assertValueEqual(MenuAccess.OWNER, MenuAccess.of(MESecurity.id("security_emitter")),
-                    "only the owner opens a Security Emitter's settings");
-
-            var forged = new SecurityMenu(10, stranger.getInventory(), terminal);
-            stranger.containerMenu = forged;
-            forged.setAlarm(stranger, new SetAlarm(10, AlarmMode.OFF));
-            helper.assertValueEqual(AlarmMode.ALERT, data.alarmMode(id), "a menu a non-owner forged changes nothing");
-            stranger.containerMenu = stranger.inventoryMenu;
-
-            var menu = new SecurityMenu(9, owner.getInventory(), terminal);
-            owner.containerMenu = menu;
-            menu.setAlarm(stranger, new SetAlarm(9, AlarmMode.OFF));
-            menu.setAlarm(owner, new SetAlarm(8, AlarmMode.OFF));
-            helper.assertValueEqual(AlarmMode.ALERT, data.alarmMode(id), "another player or another menu id is ignored");
-            menu.setAlarm(owner, new SetAlarm(9, AlarmMode.OFF));
-            helper.assertValueEqual(AlarmMode.OFF, data.alarmMode(id), "the owner switches alerts off");
-            owner.containerMenu = owner.inventoryMenu;
-
-            data.retire(id);
-            helper.assertValueEqual(AlarmMode.DEFAULT, data.alarmMode(id), "a retired terminal keeps no setting");
-            level.destroyBlock(position, false);
-            helper.succeed();
-        });
+    private static ItemStack wirelessTerminal(WirelessTerminalItem item, GlobalPos link, boolean card) {
+        var stack = new ItemStack(item);
+        WirelessTerminalItem.LINKABLE_HANDLER.link(stack, link);
+        if (card) item.getUpgrades(stack).addItems(MESecurity.ALERT_CARD.toStack());
+        return stack;
     }
 
     private static boolean lit(ServerLevel level, BlockPos lamp) {

@@ -19,10 +19,8 @@ import appeng.client.gui.widgets.VerticalButtonBar;
 import dev.ae2security.MESecurity;
 import dev.ae2security.menu.SecurityMenu;
 import dev.ae2security.network.EditPolicy;
-import dev.ae2security.network.SetAlarm;
 import dev.ae2security.network.PlayerSearchResult;
 import dev.ae2security.network.PolicySnapshot;
-import dev.ae2security.security.AlarmMode;
 import dev.ae2security.security.OwnershipConfirmation;
 import dev.ae2security.security.Permission;
 import guideme.GuidesCommon;
@@ -58,8 +56,6 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
     private AETextField transferName;
     private AE2Button trustButton;
     private TransferTabButton transferTab;
-    private AlarmTabButton alarmTab;
-    private AlarmMode displayedAlarm;
     private TransferPopup popup;
     private PlayerPageScroll pageScroll;
     private AccessPanel access;
@@ -102,8 +98,6 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         toolbar = new VerticalButtonBar();
         toolbar.add(help);
         toolbar.add(transferTab);
-        alarmTab = new AlarmTabButton(button -> cycleAlarm());
-        toolbar.add(alarmTab);
         toolbar.setPosition(style.getWidget("verticalToolbar").resolve(new Rect2i(0, 0, imageWidth, imageHeight)));
         toolbar.populateScreen(this::addRenderableWidget, new Rect2i(leftPos, topPos, imageWidth, imageHeight), null);
         toolbar.updateBeforeRender();
@@ -156,7 +150,6 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         });
 
         displayed = menu.snapshot();
-        displayedAlarm = menu.alarmMode();
         if (displayed != null) players.refresh(true);
         refreshControls();
         setInitialFocus(search);
@@ -200,12 +193,6 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         if (player != null) {
             send(player.trusted() ? EditPolicy.Action.REMOVE : EditPolicy.Action.TRUST, Permission.VIEW.bit());
         }
-    }
-
-    /** The server answers with the new mode, which is what the button then shows. */
-    private void cycleAlarm() {
-        var mode = menu.alarmMode();
-        if (mode != null) PacketDistributor.sendToServer(new SetAlarm(menu.containerId, mode.next()));
     }
 
     /** The toolbar tab: opens the confirmation for the selected trusted player. */
@@ -303,14 +290,6 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
         transferTab.setTooltip(Tooltip.create(Component.translatable("screen.ae2security.transfer").append("\n")
                 .append(Component.translatable(trusted ? "screen.ae2security.transfer_warning"
                         : "screen.ae2security.transfer_needs_trusted").withStyle(ChatFormatting.GRAY))));
-        // Hidden until the server reports a mode; a server from before the alarm never does.
-        alarmTab.setVisibility(displayedAlarm != null);
-        if (displayedAlarm != null) {
-            String key = "screen.ae2security.alarm." + displayedAlarm.id();
-            alarmTab.show(displayedAlarm);
-            alarmTab.setTooltip(Tooltip.create(Component.translatable(key).append("\n")
-                    .append(Component.translatable(key + ".description").withStyle(ChatFormatting.GRAY))));
-        }
         boolean confirming = popupOpen();
         transferName.active = confirming && !pending && !searchPending;
         popup.confirm.active = confirming && !pending && !searchPending
@@ -362,10 +341,6 @@ public final class SecurityScreen extends AbstractContainerScreen<SecurityMenu> 
                     || old.revision() != displayed.revision()
                     || old.directoryRevision() != displayed.directoryRevision()))
                 players.refresh(false);
-            refreshControls();
-        }
-        if (displayedAlarm != menu.alarmMode()) {
-            displayedAlarm = menu.alarmMode();
             refreshControls();
         }
         var edit = edits.accept(menu.editResult());

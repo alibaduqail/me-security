@@ -39,7 +39,7 @@ Only the network's owner can open its screen. The two buttons on the left choose
 | Triggered by | **Strangers**: only players who are neither the owner nor trusted. **Everyone**: anyone who is denied, including a trusted player using a permission they do not have. |
 | Redstone output | **Pulse when denied**: off until a denial, then a two-tick pulse. **Inverted pulse**: emits all the time and stops for two ticks on a denial. |
 
-An emitter fires whether or not the terminal's chat alerts are on. Checks that run by
+An emitter fires whether or not anyone carries an Intrusion Alert Card. Checks that run by
 themselves, such as an open screen being rechecked, never trigger it. An operator using
 the admin bypass is never denied, and nothing fires while conflicting terminals block the
 network for everyone.

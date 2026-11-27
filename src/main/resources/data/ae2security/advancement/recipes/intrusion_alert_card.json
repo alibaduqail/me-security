@@ -1,0 +1,10 @@
+{
+  "parent":"minecraft:recipes/root",
+  "criteria":{
+    "has_terminal":{"trigger":"minecraft:inventory_changed","conditions":{"items":[{"items":"ae2security:security_terminal"}]}},
+    "has_wireless_terminal":{"trigger":"minecraft:inventory_changed","conditions":{"items":[{"items":["ae2:wireless_terminal","ae2:wireless_crafting_terminal"]}]}},
+    "has_the_recipe":{"trigger":"minecraft:recipe_unlocked","conditions":{"recipe":"ae2security:intrusion_alert_card"}}
+  },
+  "requirements":[["has_terminal","has_wireless_terminal","has_the_recipe"]],
+  "rewards":{"recipes":["ae2security:intrusion_alert_card"]}
+}

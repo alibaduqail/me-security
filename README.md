@@ -52,7 +52,11 @@ With Jade or WTHIT installed, looking at a Security Terminal shows its owner's n
 
 The terminal notices when a player you have not trusted is denied on its network: opening a terminal or device, moving items, building on it or breaking it, tampering with the Security Terminal itself, or a wireless terminal that is still linked. A trusted player who merely lacks one permission is never reported, and neither is an operator using the admin bypass. Nothing is raised while conflicting terminals block the network for everyone, or for checks the player did not start, such as AE2 rechecking an open screen.
 
-The alarm button in the screen's left toolbar, under the transfer arrow, switches owner alerts between **Off** and **Alert** (the default). With Alert, the owner gets a chat message naming the player, the permission they were denied and the terminal's position; an owner who is offline gets one summary per terminal at their next login. Reports are limited to one per intruder and terminal each minute, and each is also written to the server log. The login summary keeps at most 16 intruders per terminal and is cleared once shown.
+Each report is written to the server log, limited to one per intruder and terminal each minute. Players hear about it through an Intrusion Alert Card, and redstone through a Security Emitter.
+
+### Intrusion Alert Card
+
+An upgrade card (an advanced card and a wireless receiver) for AE2's wireless and wireless crafting terminals, and for AE2 Wireless Terminals' terminals when that mod is installed. One card per terminal. The network's owner and every trusted player who is online with a carded terminal in their inventory or offhand, linked to a wireless access point on the network, is told of each report: a line above the hotbar naming the player, the permission they were denied and the Security Terminal's position, with a ping only they hear. Range and dimension do not matter, the network's chunks need not be loaded, and the terminal uses no power for it. Alerts are live only: nothing is kept for players who are offline or not carrying a card. Remove the card to stop them.
 
 ### Security Emitter
 
@@ -63,7 +67,7 @@ The ME Security Emitter is a level-emitter-style cable part (crafted from a leve
 | Triggered by | **Strangers** (default): only players who are neither the owner nor trusted. **Everyone**: anyone who is denied, including a trusted player using a permission they do not have. |
 | Redstone output | **Pulse when denied** (default), or **Inverted pulse**, which emits all the time and stops for two ticks on a denial. |
 
-An emitter works independently of the terminal's alerts and follows the same rules about what counts as a denial. Anyone who can touch the network can trigger it, so connect only what a stranger may set off. Players with Build can remove it like any other network hardware.
+An emitter works independently of Intrusion Alert Cards and follows the same rules about what counts as a denial. Anyone who can touch the network can trigger it, so connect only what a stranger may set off. Players with Build can remove it like any other network hardware.
 
 Wireless terminals still require normal AE2 access-point pairing and range or quantum-link conditions. A paired item does not grant ME Security permissions.
 

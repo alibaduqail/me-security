@@ -13,7 +13,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.*;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.common.util.FakePlayer;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 /** No item slots: all access editing is validated against the live server block and policy revision. */
@@ -32,8 +31,6 @@ public final class SecurityMenu extends AbstractContainerMenu {
     private long sentRevision = -1;
     private long sentDirectoryRevision = -1;
     private String sentStatus = "";
-    /** Server: the mode last sent. Client: the mode last received, or null from a server without alarms. */
-    private AlarmMode alarmMode;
     private PolicySnapshot snapshot;
     private PlayerSearchResult searchResult;
     private PolicyEditResult editResult;
@@ -61,10 +58,6 @@ public final class SecurityMenu extends AbstractContainerMenu {
     public PolicyEditResult editResult() { return editResult; }
     public void acceptSearchResult(PlayerSearchResult result) {
         if (player.level().isClientSide() && result.menuId() == containerId) searchResult = result;
-    }
-    public AlarmMode alarmMode() { return alarmMode; }
-    public void acceptAlarmState(AlarmState state) {
-        if (player.level().isClientSide() && state.menuId() == containerId) alarmMode = state.mode();
     }
     public void acceptEditResult(PolicyEditResult result) {
         if (player.level().isClientSide() && result.menuId() == containerId) editResult = result;
@@ -97,14 +90,6 @@ public final class SecurityMenu extends AbstractContainerMenu {
         }
         var data = SecuritySavedData.get(serverPlayer.server);
         var policy = data.policy(terminalId);
-        var mode = data.alarmMode(terminalId);
-        // A client from before the alarm has no channel for it; it gets everything else as before.
-        // A fake player has no real connection to ask.
-        if (mode != alarmMode && !(serverPlayer instanceof FakePlayer)
-                && serverPlayer.connection.hasChannel(AlarmState.TYPE)) {
-            PacketDistributor.sendToPlayer(serverPlayer, new AlarmState(containerId, mode));
-            alarmMode = mode;
-        }
         var grid = SecurityAccess.grid(terminal());
         String status = grid == null ? "disconnected" : grid.getService(ISecurityGrid.class).terminalIds().size() > 1 ? "conflict" : "protected";
         if (policy.revision() == sentRevision && data.directoryRevision() == sentDirectoryRevision && status.equals(sentStatus)) return;
@@ -148,17 +133,6 @@ public final class SecurityMenu extends AbstractContainerMenu {
         if (editBudget <= 0) return true;
         editBudget--;
         return false;
-    }
-
-    public void setAlarm(Player actor, SetAlarm request) {
-        if (!(actor instanceof ServerPlayer serverPlayer) || actor != player || actor.containerMenu != this
-                || request.menuId() != containerId || overEditBudget()) return;
-        if (!stillValid(actor)) {
-            serverPlayer.closeContainer();
-            return;
-        }
-        SecuritySavedData.get(serverPlayer.server).setAlarmMode(terminalId, request.mode());
-        broadcastChanges();
     }
 
     public void edit(Player actor, EditPolicy edit) {
