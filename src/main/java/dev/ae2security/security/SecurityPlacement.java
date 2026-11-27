@@ -217,6 +217,7 @@ public final class SecurityPlacement {
             if (grid.getService(ISecurityGrid.class).terminalIds().isEmpty()) continue;
             var decision = SecurityAccess.check(grid, player, Permission.BUILD, false);
             if (decision != AccessDecision.ALLOW) {
+                if (decision == AccessDecision.DENIED) SecurityAlarm.denied(grid, player, Permission.BUILD);
                 SecurityAccess.notice(player, decision == AccessDecision.DENIED
                         ? Component.translatable("message.ae2security.build_denied")
                         : Component.translatable(decision.translationKey()));

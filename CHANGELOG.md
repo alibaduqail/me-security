@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **Intrusion alarm.** The Security Terminal notices when a player its owner has not trusted is denied on the network: opening a terminal or device, moving items, building, breaking, or tampering with the terminal itself. The owner gets a chat message naming the player and the terminal's position, or a summary at their next login if they were offline. A trusted player who only lacks one permission never raises it. Reports are limited to one per intruder and terminal each minute and are also written to the server log.
+- **Redstone alarm output.** A new button in the terminal screen's left toolbar switches the alarm between Off, Alert (the default) and Alert and redstone. With redstone on, the block holding the terminal emits a signal from every side for 5 seconds after each denied attempt, to drive lamps, note blocks, pistons or doors.
+
+### Compatibility
+
+- No save-format or policy-protocol changes. The payload protocol stays at 6: the alarm button uses two new optional payloads with a version of their own, so 1.2.x clients and servers still connect to each other. A client without them does not show the button, and a server without them has no alarm.
+- Existing terminals start on Alert. Redstone output is off until the owner switches it on.
+
 ## 1.2.3 - 2026-11-27
 
 ### Added

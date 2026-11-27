@@ -10,6 +10,7 @@
     "MenuTypeBuilderMixin",
     "PartPlacementMixin",
     "CableBusBlockEntityMixin",
+    "CableBusContainerMixin",
     "CablePartMixin",
     "AEBaseMenuMixin",
     "MenuBroadcastMixin",

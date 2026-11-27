@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
+import dev.ae2security.security.AlarmMode;
 import dev.ae2security.security.Permission;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.DecoderException;
@@ -50,6 +51,26 @@ class PayloadCodecTest {
                 List.of(new PolicySnapshot.PlayerEntry(target, "Guest", true, Permission.ALL)));
         assertEquals(page, roundTrip(page, PlayerSearchResult.CODEC));
 
+    }
+
+    @Test
+    void alarmPayloadsRoundTripEveryMode() {
+        for (var mode : AlarmMode.values()) {
+            assertEquals(new AlarmState(4, mode), roundTrip(new AlarmState(4, mode), AlarmState.CODEC));
+            assertEquals(new SetAlarm(4, mode), roundTrip(new SetAlarm(4, mode), SetAlarm.CODEC));
+        }
+    }
+
+    @Test
+    void alarmPayloadsRejectAModeThisVersionDoesNotKnow() {
+        var buffer = newBuffer();
+        try {
+            buffer.writeVarInt(4);
+            buffer.writeVarInt(AlarmMode.values().length);
+            assertThrows(RuntimeException.class, () -> SetAlarm.CODEC.decode(buffer));
+        } finally {
+            buffer.release();
+        }
     }
 
     @Test
@@ -161,6 +182,8 @@ class PayloadCodecTest {
 
         assertThrows(VersionCaptured.class, () -> SecurityPayloads.register(event));
         assertEquals(List.of(PROTOCOL_VERSION), requested);
+        // The alarm payloads are registered afterwards, optional and under a version of their own.
+        assertEquals("1", SecurityPayloads.ALARM_VERSION);
     }
 
     private static final class VersionCaptured extends RuntimeException {
