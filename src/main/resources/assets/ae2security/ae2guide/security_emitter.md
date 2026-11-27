@@ -36,8 +36,8 @@ Only the network's owner can open its screen. The wide button sets who triggers 
 
 | Setting | Options |
 | --- | --- |
-| Triggered by | **Strangers**: only players who are neither the owner nor trusted. **Everyone**: anyone who is denied, including a trusted player using a permission they do not have. |
-| Redstone output | **Pulse when denied**: off until a denial, then a two-tick pulse. **Inverted pulse**: emits all the time and stops for two ticks on a denial. |
+| Triggered by | **Strangers** (default): only players who are neither the owner nor trusted. **Everyone**: anyone who is denied, including a trusted player using a permission they do not have. |
+| Redstone output | **Pulse** (default): off until an action is denied, then a two-tick pulse like an observer's. **Inverted pulse**: emits all the time and stops for two ticks when an action is denied. |
 
 An emitter fires whether or not the terminal's chat alerts are on. Checks that run by
 themselves, such as an open screen being rechecked, never trigger it. An operator using

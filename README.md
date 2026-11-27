@@ -61,7 +61,7 @@ The ME Security Emitter is a level-emitter-style cable part (crafted from a leve
 | Setting | Options |
 |---|---|
 | Triggered by | **Strangers** (default): only players who are neither the owner nor trusted. **Everyone**: anyone who is denied, including a trusted player using a permission they do not have. |
-| Redstone output | **Pulse when denied** (default), or **Inverted pulse**, which emits all the time and stops for two ticks on a denial. |
+| Redstone output | **Pulse** (default), or **Inverted pulse**, which emits all the time and stops for two ticks on a denial. |
 
 An emitter works independently of the terminal's alerts and follows the same rules about what counts as a denial. Anyone who can touch the network can trigger it, so connect only what a stranger may set off. Players with Build can remove it like any other network hardware.
 

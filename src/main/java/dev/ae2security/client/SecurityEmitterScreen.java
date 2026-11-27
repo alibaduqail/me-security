@@ -9,8 +9,6 @@ import appeng.client.gui.widgets.AE2Button;
 import appeng.client.gui.widgets.IconButton;
 import dev.ae2security.menu.SecurityEmitterMenu;
 import dev.ae2security.security.EmitterTrigger;
-import net.minecraft.ChatFormatting;
-import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 
@@ -37,7 +35,6 @@ public final class SecurityEmitterScreen extends AEBaseScreen<SecurityEmitterMen
             shownTrigger = menu.trigger;
             var trigger = KEY + "trigger." + menu.trigger.id();
             triggerButton.setMessage(Component.translatable(KEY + "trigger_line", Component.translatable(trigger)));
-            triggerButton.setTooltip(Tooltip.create(Component.translatable(trigger + ".description")));
         }
         outputButton.show(menu.inverted);
     }
@@ -54,12 +51,10 @@ public final class SecurityEmitterScreen extends AEBaseScreen<SecurityEmitterMen
 
         @Override protected Icon getIcon() { return inverted ? Icon.REDSTONE_LOW : Icon.REDSTONE_HIGH; }
 
+        /** Just the mode's name; the guide explains what each one does. */
         @Override
         public List<Component> getTooltipMessage() {
-            var key = KEY + "output." + (inverted ? "inverted" : "normal");
-            return List.of(Component.translatable(KEY + "output"),
-                    Component.translatable(key).withStyle(ChatFormatting.WHITE),
-                    Component.translatable(key + ".description").withStyle(ChatFormatting.GRAY));
+            return List.of(Component.translatable(KEY + "output." + (inverted ? "inverted" : "normal")));
         }
     }
 }
