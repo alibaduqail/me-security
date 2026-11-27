@@ -4,6 +4,7 @@ import appeng.api.networking.GridServices;
 import appeng.api.parts.PartModels;
 import dev.ae2security.gametest.SecurityGameTests;
 import dev.ae2security.gametest.HardwareGameTests;
+import dev.ae2security.integration.SecurityTerminalTooltip;
 import dev.ae2security.menu.SecurityMenu;
 import dev.ae2security.network.SecurityPayloads;
 import dev.ae2security.part.SecurityTerminalItem;
@@ -52,6 +53,7 @@ public final class MESecurity {
         MENUS.register(bus);
         CREATIVE_TABS.register(bus);
         PartModels.registerModels(SecurityTerminalPart.MODEL_OFF, SecurityTerminalPart.MODEL_ON);
+        SecurityTerminalTooltip.register();
         bus.addListener(this::setup);
         bus.addListener(SecurityPayloads::register);
         bus.addListener(this::gameTests);

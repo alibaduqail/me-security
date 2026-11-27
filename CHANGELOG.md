@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Jade and WTHIT tooltips for the Security Terminal: everyone sees the owner's name, and each player sees their own access (Owner, their granted permissions, or None), or a warning when the network's access is blocked. Neither mod is required; the tooltip goes through AE2's built-in tooltip support.
+
 ## 1.2.2 - 2026-11-26
 
 ### Fixed
