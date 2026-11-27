@@ -146,7 +146,9 @@ jobs:
           game-versions: 1.21.1
           java: 21
           environment: client | server
+          # CurseForge dependencies are given by slug: mc-publish looks numeric IDs up through
+          # CurseForge's public API and quietly drops a dependency when that lookup fails.
           dependencies: |
-            ae2(required){modrinth:XxWD5pD3}{curseforge:223794}
-            guideme(required){modrinth:Ck4E7v7R}{curseforge:1173950}
-            ae2wtlib(optional){modrinth:pNabrMMw}{curseforge:304024}
+            ae2(required){modrinth:XxWD5pD3}{curseforge:applied-energistics-2}
+            guideme(required){modrinth:Ck4E7v7R}{curseforge:guideme}
+            ae2wtlib(optional){modrinth:pNabrMMw}{curseforge:ae2wtlib}
