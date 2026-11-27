@@ -19,8 +19,8 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * A level-emitter-style part that emits redstone for a few seconds after an action is denied on its
- * network. What the signal drives is up to the player. It grants and blocks nothing itself.
+ * A level-emitter-style part that emits a two-tick redstone pulse, like an observer's, when an action
+ * is denied on its network. What the signal drives is up to the player. It grants and blocks nothing itself.
  */
 public final class SecurityEmitterPart extends AbstractLevelEmitterPart {
     private static final String TRIGGER_TAG = "ae2security:trigger";

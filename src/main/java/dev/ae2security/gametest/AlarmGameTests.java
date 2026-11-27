@@ -80,16 +80,23 @@ public final class AlarmGameTests {
             helper.assertTrue(SecurityAlarm.pulsing(emitter), "a stranger triggers it, whatever the terminal's alerts");
             helper.assertValueEqual(0, emitter.isProvidingStrongPower(),
                     "the output changes at the end of the tick, never in the middle of the denied action");
-            helper.runAfterDelay(2, () -> {
+            helper.runAfterDelay(1, () -> {
                 helper.assertValueEqual(15, emitter.isProvidingStrongPower(), "the emitter's output");
                 helper.assertTrue(lit(level, lamp), "a lamp in front of the emitter lights");
-                helper.runAfterDelay(SecurityAlarm.PULSE_TICKS + 10, () -> {
-                    helper.assertFalse(SecurityAlarm.pulsing(emitter), "the pulse ends by itself");
+                helper.assertFalse(SecurityAccess.allow(grid, stranger, Permission.EXTRACT, false), "the stranger tries again");
+                helper.runAfterDelay(SecurityAlarm.PULSE_TICKS, () -> {
+                    helper.assertFalse(SecurityAlarm.pulsing(emitter),
+                            "the pulse lasts an observer's two ticks: an attempt during it does not stretch it");
                     helper.assertValueEqual(0, emitter.isProvidingStrongPower(), "the output after the pulse");
-                    helper.assertFalse(lit(level, lamp), "the lamp goes out again");
-                    cleanUp(level, position, id);
-                    level.destroyBlock(lamp, false);
-                    helper.succeed();
+                    helper.assertFalse(SecurityAccess.allow(grid, stranger, Permission.EXTRACT, false), "a later attempt");
+                    helper.assertTrue(SecurityAlarm.pulsing(emitter), "a later attempt gives a pulse of its own");
+                    helper.runAfterDelay(SecurityAlarm.PULSE_TICKS + 10, () -> {
+                        helper.assertFalse(SecurityAlarm.pulsing(emitter), "the pulse ends by itself");
+                        helper.assertFalse(lit(level, lamp), "the lamp goes out again");
+                        cleanUp(level, position, id);
+                        level.destroyBlock(lamp, false);
+                        helper.succeed();
+                    });
                 });
             });
         });
@@ -119,7 +126,7 @@ public final class AlarmGameTests {
             helper.assertTrue(SecurityAlarm.pulsing(emitter), "an emitter watching everyone reacts to a trusted player");
             helper.assertTrue(SecurityAlarm.digest(level.getServer(), owner.getUUID()).isEmpty(),
                     "a trusted player is still never reported to the owner");
-            helper.runAfterDelay(2, () -> {
+            helper.runAfterDelay(1, () -> {
                 helper.assertValueEqual(0, emitter.isProvidingStrongPower(), "an inverted emitter goes dark when triggered");
                 emitter.setInverted(false);
                 helper.assertValueEqual(15, emitter.isProvidingStrongPower(), "switching back takes effect at once");

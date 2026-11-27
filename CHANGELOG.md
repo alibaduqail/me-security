@@ -5,7 +5,7 @@
 ### Added
 
 - **Intrusion alarm.** The Security Terminal notices when a player its owner has not trusted is denied on the network: opening a terminal or device, moving items, building, breaking, or tampering with the terminal itself. The owner gets a chat message naming the player and the terminal's position, or a summary at their next login if they were offline. A trusted player who only lacks one permission is never reported. A new button in the terminal screen's left toolbar switches these alerts off and on (on by default). Reports are limited to one per intruder and terminal each minute and are also written to the server log.
-- **ME Security Emitter.** A new level-emitter-style part that emits redstone for 5 seconds after an action is denied on its network, to drive whatever the player builds. Its owner-only screen chooses whether strangers or everyone (including trusted players lacking a permission) trigger it, and whether the output is inverted. Crafted from a level emitter and an engineering processor.
+- **ME Security Emitter.** A new level-emitter-style part that emits a two-tick redstone pulse, like an observer's, when an action is denied on its network, to drive whatever the player builds. Its owner-only screen chooses whether strangers or everyone (including trusted players lacking a permission) trigger it, and whether the output is inverted. Crafted from a level emitter and an engineering processor.
 
 ### Compatibility
 

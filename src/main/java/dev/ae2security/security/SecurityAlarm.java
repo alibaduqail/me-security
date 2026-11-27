@@ -28,7 +28,7 @@ import org.slf4j.Logger;
 
 /**
  * The intrusion alarm. When a player is denied on a protected network, every Security Emitter on it
- * that watches for that kind of player emits a redstone pulse. When the player has no standing there
+ * that watches for that kind of player emits a short redstone pulse, as long as an observer's. When the player has no standing there
  * (neither owner nor trusted), the network's Security Terminal also tells its owner, unless the owner
  * switched alerts off.
  *
@@ -36,8 +36,11 @@ import org.slf4j.Logger;
  */
 public final class SecurityAlarm {
     private static final Logger LOGGER = LogUtils.getLogger();
-    /** How long a Security Emitter stays triggered after a denied attempt. A further attempt restarts it. */
-    public static final int PULSE_TICKS = 100;
+    /**
+     * How long a Security Emitter stays triggered after a denied attempt: two game ticks, an observer's
+     * pulse. An attempt while the pulse is on adds nothing, so every pulse is followed by a gap.
+     */
+    public static final int PULSE_TICKS = 2;
     /** One report per intruder and terminal in this many ticks, however often they try. */
     static final int REPORT_INTERVAL_TICKS = 1200;
     private static final int MAX_REPORT_KEYS = 1024;
@@ -156,7 +159,7 @@ public final class SecurityAlarm {
     }
 
     private static void pulse(SecurityEmitterPart emitter, long tick) {
-        if (PULSING.put(emitter, tick + PULSE_TICKS) == null) CHANGED.add(emitter);
+        if (PULSING.putIfAbsent(emitter, tick + PULSE_TICKS) == null) CHANGED.add(emitter);
     }
 
     static void tick(MinecraftServer server) {
