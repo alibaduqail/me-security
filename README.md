@@ -18,6 +18,7 @@ Install the same mod set on the client and dedicated server.
 | Applied Energistics 2 | 19.2.20 | Yes |
 | GuideME | 21.1.1 or newer | Yes; separate mod that AE2 requires |
 | AE2 Wireless Terminals | 19.5.1 | No |
+| Jade or WTHIT | Any version AE2 supports | No |
 
 The AE2 and AE2 Wireless Terminals versions are deliberately exact. ME Security uses version-targeted enforcement hooks and refuses unsupported combinations instead of silently disabling a check. NeoForge and GuideME accept newer releases.
 
@@ -44,6 +45,8 @@ Collect-only withdrawal becomes available after the entire job finishes successf
 Build follows actual connections: differently colored, disconnected cables do not require permission from a neighboring network, and isolated side parts in a block without a central cable are separate grids. Adding a center cable checks the internal parts it joins and exposed, compatible neighbors. Removing a part checks its own internal and outward nodes; mining a whole cable-bus block checks every part. Recoloring checks the current network and neighbors the new color would connect to, and rejects a merge containing multiple Security Terminals.
 
 Only one Security Terminal may be attached to a connected grid. Normal player placement of a second terminal is rejected without consuming the item. If two protected networks are merged through unloaded topology or another nonstandard path, the existing conflict state still denies player network access until one terminal is removed. Each terminal owner can still open their own management screen to diagnose that fallback conflict.
+
+With Jade or WTHIT installed, looking at a Security Terminal shows its owner's name to every player, and below it your own access: Owner, the permissions you have been granted, or None. A network with conflicting terminals or an unresolved policy says that access is blocked. The tooltip uses AE2's built-in tooltip support, so neither mod is a dependency.
 
 Wireless terminals still require normal AE2 access-point pairing and range or quantum-link conditions. A paired item does not grant ME Security permissions.
 
