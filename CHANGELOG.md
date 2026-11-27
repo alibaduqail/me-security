@@ -1,10 +1,15 @@
 # Changelog
 
-## Unreleased
+## 1.2.3 - 2026-11-27
 
 ### Added
 
 - Jade and WTHIT tooltips for the Security Terminal: everyone sees the owner's name, and each player sees their own access (Owner, their granted permissions, or None), or a warning when the network's access is blocked. Neither mod is required; the tooltip goes through AE2's built-in tooltip support.
+
+### Compatibility
+
+- Minecraft 1.21.1, NeoForge 21.1.250 or newer, Applied Energistics 2 19.2.20, GuideME 21.1.1 or newer, optional AE2 Wireless Terminals 19.5.1, optional Jade or WTHIT.
+- No save or protocol changes from 1.2.2. Payload protocol stays at 6, so 1.2.x clients and servers can connect to each other as long as they use the same AE2 version. The tooltip needs 1.2.3 on the server; a 1.2.2 server sends no tooltip data.
 
 ## 1.2.2 - 2026-11-26
 
