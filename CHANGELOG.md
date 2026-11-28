@@ -4,9 +4,8 @@
 
 ### Added
 
-- **Intrusion alarm.** The Security Terminal notices when a player its owner has not trusted is denied on the network: opening a terminal or device, moving items, building, breaking, or tampering with the terminal itself. A trusted player who only lacks one permission is never reported. Reports are limited to one per intruder and terminal each minute and are written to the server log.
-- **Intrusion Alert Card.** A new upgrade card for wireless terminals (AE2's own, and AE2 Wireless Terminals' when installed), crafted from an advanced card and a wireless receiver. The owner and trusted players carrying a carded terminal linked to the network see each report above their hotbar with a ping, at any range and in any dimension. Alerts are live only; nothing is saved for players who are offline.
-- **ME Security Emitter.** A new level-emitter-style part that emits a two-tick redstone pulse, like an observer's, when an action is denied on its network, to drive whatever the player builds. Its owner-only screen chooses whether strangers or everyone (including trusted players lacking a permission) trigger it, and whether the output is inverted. Crafted from a level emitter and an engineering processor.
+- **ME Security Emitter.** A new level-emitter-style cable part that emits a two-tick redstone pulse, like an observer's, whenever an action is denied on its network: opening a terminal or device, taking items, building, breaking, or tampering with the Security Terminal. Wire it to a lamp, a door or anything else. Its screen, which only the network's owner can open, chooses whether only strangers (players who are neither the owner nor trusted) or everyone trigger it, and whether the output is inverted. Crafted from a level emitter and an engineering processor.
+- **Intrusion Alert Card.** A new upgrade card for wireless terminals (AE2's own, and AE2 Wireless Terminals' when installed), crafted from an advanced card and a wireless receiver. When a stranger is denied on a network, the owner and trusted players carrying a carded terminal linked to it get an alert above their hotbar with a ping, at any range and in any dimension. Each intruder is reported at most once a minute. Alerts are live only, so nothing is kept for players who are offline, and every report is also written to the server log.
 
 ## 1.2.3 - 2026-11-27
 
